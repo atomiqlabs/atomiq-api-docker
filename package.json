@@ -16,9 +16,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@atomiqlabs/chain-starknet": "file:../atomiq-chain-starknet",
-    "@atomiqlabs/sdk": "file:../atomiq-sdk",
-    "@atomiqlabs/storage-sqlite": "file:../atomiq-storage-sqlite",
+    "@atomiqlabs/sdk": "github:atomiqlabs/atomiq-sdk#api",
+    "@atomiqlabs/storage-sqlite": "github:atomiqlabs/atomiq-storage-sqlite#develop",
+    "@atomiqlabs/chain-starknet": "github:atomiqlabs/atomiq-chain-starknet#develop",
     "express": "^5.2.1"
   },
   "devDependencies": {

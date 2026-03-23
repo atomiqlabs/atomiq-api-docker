@@ -10,7 +10,7 @@ const bitcoinNetwork = process.env.BITCOIN_NETWORK === "MAINNET" ? BitcoinNetwor
 
 const chains = [StarknetInitializer] as const;
 
-const Factory = new SwapperFactory(chains as any);
+const Factory = new SwapperFactory(chains);
 
 const swapper = Factory.newSwapper({
     chains: {
@@ -23,7 +23,7 @@ const swapper = Factory.newSwapper({
     chainStorageCtor: name => new SqliteStorageManager("STORE_" + name + ".sqlite3"),
 });
 
-const api = new SwapperApi(swapper as any);
+const api = new SwapperApi(swapper);
 
 const app = express();
 app.use(express.json());
