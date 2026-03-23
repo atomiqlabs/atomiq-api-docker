@@ -1,0 +1,30 @@
+{
+  "name": "atomiq-api-docker",
+  "version": "1.0.0",
+  "description": "atomiq-api-docker",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:atomiqlabs/atomiq-api-docker.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@atomiqlabs/chain-starknet": "file:../atomiq-chain-starknet",
+    "@atomiqlabs/sdk": "file:../atomiq-sdk",
+    "@atomiqlabs/storage-sqlite": "file:../atomiq-storage-sqlite",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.5.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}
