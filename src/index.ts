@@ -48,11 +48,11 @@ function validateAndCoerce(
     for (const [field, rule] of Object.entries(schema)) {
         const value = input[field];
 
-        if (rule.required && (value === undefined || value === null || value === "")) {
+        if (rule.required && (value === undefined || value === null)) {
             return {input, error: `Missing required field: '${path(field)}' — ${rule.description}`};
         }
 
-        if (value === undefined || value === null || value === "") continue;
+        if (value === undefined || value === null) continue;
 
         switch (rule.type) {
             case "number": {
@@ -69,9 +69,9 @@ function validateAndCoerce(
             }
             case "array": {
                 if (!Array.isArray(value)) return {input, error: `Field '${path(field)}' must be an array`};
-                if (rule.items) {
+                const itemRule = (rule.items ?? {type: "string"}) as InputSchemaField<any>;
+                {
                     for (let i = 0; i < value.length; i++) {
-                        const itemRule = rule.items as InputSchemaField<any>;
                         // Validate element type and coerce
                         switch (itemRule.type) {
                             case "string":
