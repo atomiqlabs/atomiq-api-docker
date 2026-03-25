@@ -49,7 +49,7 @@ function validateAndCoerce(
         const value = input[field];
 
         if (rule.required && (value === undefined || value === null)) {
-            return {input, error: `Missing required field: '${path(field)}' — ${rule.description}`};
+            return {input, error: `Missing required field: '${path(field)}'. ${rule.description}`};
         }
 
         if (value === undefined || value === null) continue;
