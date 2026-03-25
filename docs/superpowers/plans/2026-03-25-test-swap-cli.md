@@ -35,6 +35,7 @@ import * as fs from "fs";
 import {Transaction, WIF} from "@scure/btc-signer";
 import {pubECDSA, TEST_NETWORK} from "@scure/btc-signer/utils";
 import {getAddress} from "@scure/btc-signer";
+import {ec, CallData, hash} from "starknet";
 
 const API_URL = process.env.API_URL || "http://localhost:3000";
 const POLL_INTERVAL_DEFAULT = 5000;
@@ -83,7 +84,6 @@ if (!isBtcToken(srcToken) || !isBtcToken(dstToken)) {
     starknetPrivKey = fs.readFileSync("starknet.key").toString().trim();
 
     // Derive starknet address from private key (same logic as StarknetKeypairWallet)
-    const {ec, CallData, hash} = await import("starknet");
     const OZaccountClassHash = "0x00261c293c8084cd79086214176b33e5911677cec55104fddc8d25b0b736dcad";
     const publicKey = ec.starkCurve.getStarkKey(starknetPrivKey);
     const constructorCallData = CallData.compile({publicKey});
@@ -113,13 +113,17 @@ console.log(`  srcAddress: ${srcAddress || "(empty)"}`);
 console.log(`  dstAddress: ${dstAddress || "(empty)"}`);
 ```
 
-- [ ] **Step 2: Verify the script runs and prints wallet info**
+- [ ] **Step 2: Add starknet as an explicit dependency**
+
+Run: `npm install starknet`
+
+- [ ] **Step 3: Verify the script runs and prints wallet info**
 
 Run: `cd /Users/marci/dev/Atomiq/atomiq-api-docker && npx ts-node src/scripts/test-swap.ts BTC STRK 3000 EXACT_IN`
 
 Expected: Prints bitcoin and starknet wallet addresses, swap creation message.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add src/scripts/test-swap.ts
@@ -332,10 +336,11 @@ async function main() {
     await handleAction(swapId, swap.currentAction);
 
     // Poll loop
+    let lastStatus: any = swap;
     const deadline = Date.now() + TIMEOUT_MS;
     while (Date.now() < deadline) {
-        const pollInterval = swap.currentAction?.pollTimeSeconds
-            ? swap.currentAction.pollTimeSeconds * 1000
+        const pollInterval = lastStatus.currentAction?.pollTimeSeconds
+            ? lastStatus.currentAction.pollTimeSeconds * 1000
             : POLL_INTERVAL_DEFAULT;
         await new Promise(r => setTimeout(r, pollInterval));
 
@@ -346,6 +351,7 @@ async function main() {
             console.error(`  Poll error: ${e.message}`);
             continue;
         }
+        lastStatus = status;
 
         // Print state transitions
         if (status.state.name !== lastStateName) {
@@ -443,6 +449,6 @@ git commit -m "Fix issues found during live testing"
 
 - The script does NOT import `@atomiqlabs/sdk` — it's a pure REST client
 - For BTCLN→STRK swaps, the script prints the Lightning invoice but cannot pay it automatically (needs external wallet). This is documented in the output.
-- Starknet tx signing is a placeholder — the serialized unsigned tx is passed through to `submitTransaction`. If server-side signing is not supported, this will need to be enhanced with `StarknetKeypairWallet` signing.
+- Starknet tx signing is a placeholder for the initial implementation — the serialized unsigned tx is passed through to `submitTransaction`. STRK→BTC/BTCLN swaps will fail at the signing step if client-side signing is required. This is a known limitation — enhancing with proper `StarknetKeypairWallet` signing is a follow-up task.
 - The script uses `TEST_NETWORK` from `@scure/btc-signer/utils` for testnet3. For mainnet, switch to `BTC_NETWORK`.
 - `gasAmount` is not used — test wallets already have gas.
