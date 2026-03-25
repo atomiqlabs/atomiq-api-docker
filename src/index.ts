@@ -69,33 +69,12 @@ function validateAndCoerce(
             }
             case "array": {
                 if (!Array.isArray(value)) return {input, error: `Field '${path(field)}' must be an array`};
-                const itemRule = (rule.items ?? {type: "string"}) as InputSchemaField<any>;
-                {
-                    for (let i = 0; i < value.length; i++) {
-                        // Validate element type and coerce
-                        switch (itemRule.type) {
-                            case "string":
-                                if (typeof value[i] !== "string")
-                                    return {input, error: `Field '${path(field)}[${i}]' must be a string`};
-                                break;
-                            case "number": {
-                                const num = Number(value[i]);
-                                if (isNaN(num))
-                                    return {input, error: `Field '${path(field)}[${i}]' must be a number`};
-                                value[i] = num;
-                                break;
-                            }
-                            case "object":
-                                if (typeof value[i] !== "object" || Array.isArray(value[i]))
-                                    return {input, error: `Field '${path(field)}[${i}]' must be an object`};
-                                if (itemRule.properties) {
-                                    const nested = validateAndCoerce(value[i], itemRule.properties as Record<string, InputSchemaField<any>>, `${path(field)}[${i}]`);
-                                    if (nested.error) return nested;
-                                    value[i] = nested.input;
-                                }
-                                break;
-                        }
-                    }
+                const itemRule = (rule.items ?? {type: "string", required: true, description: "array element"}) as InputSchemaField<any>;
+                for (let i = 0; i < value.length; i++) {
+                    const key = `${i}`;
+                    const nested = validateAndCoerce({[key]: value[i]}, {[key]: itemRule}, `${path(field)}`);
+                    if (nested.error) return nested;
+                    value[i] = nested.input[key];
                 }
                 break;
             }
