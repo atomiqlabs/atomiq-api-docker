@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import {Transaction, WIF} from "@scure/btc-signer";
-import {pubECDSA, TEST_NETWORK, NETWORK} from "@scure/btc-signer/utils";
+import {pubECDSA, TEST_NETWORK} from "@scure/btc-signer/utils";
 import {getAddress} from "@scure/btc-signer";
 import {ec, CallData, hash} from "starknet";
 
@@ -51,11 +51,7 @@ let starknetAddress: string | null = null;
 if (isBtcToken(srcToken) || isBtcToken(dstToken)) {
     const wifStr = fs.readFileSync("bitcoin.key", "utf8").trim();
     // Try testnet WIF first; fall back to mainnet WIF (key file may use either format)
-    try {
-        btcPrivKey = WIF(TEST_NETWORK).decode(wifStr);
-    } catch (_e) {
-        btcPrivKey = WIF(NETWORK).decode(wifStr);
-    }
+    btcPrivKey = WIF(TEST_NETWORK).decode(wifStr);
     btcPubKey = pubECDSA(btcPrivKey);
     btcAddress = getAddress("wpkh", btcPrivKey, TEST_NETWORK) ?? null;
     console.log(`Bitcoin wallet loaded. Address: ${btcAddress}`);
@@ -175,12 +171,144 @@ function signStarknetTx(serializedTx: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Summary
+// Action handler
 // ---------------------------------------------------------------------------
 
-console.log(`\nSwap parameters:`);
-console.log(`  srcToken:   ${srcToken}`);
-console.log(`  dstToken:   ${dstToken}`);
-console.log(`  amount:     ${amount}`);
-console.log(`  amountType: ${amountType}`);
-console.log(`  API_URL:    ${API_URL}`);
+async function handleAction(swapId: string, action: any): Promise<boolean> {
+    if (action == null) return false;
+
+    switch (action.type) {
+        case "SignPSBT": {
+            console.log(`\nAction: SignPSBT`);
+            const tx = action.txs[0];
+            if (tx.type === "RAW_PSBT") {
+                console.error("Error: received RAW_PSBT — expected FUNDED_PSBT when bitcoin wallet params are passed.");
+                process.exit(1);
+            }
+            // tx.type === "FUNDED_PSBT"
+            const signedHex = signPsbt(tx.psbtHex, tx.signInputs);
+            const result = await submitTransaction(swapId, [signedHex]);
+            console.log(`  TX hashes: ${JSON.stringify(result)}`);
+            return true;
+        }
+
+        case "SignSmartChainTransaction": {
+            console.log(`\nAction: SignSmartChainTransaction (${action.name})`);
+            const signedTxs = action.txs.map((tx: any) => signStarknetTx(tx));
+            const result = await submitTransaction(swapId, signedTxs);
+            console.log(`  TX hashes: ${JSON.stringify(result)}`);
+            return true;
+        }
+
+        case "SendToAddress": {
+            const tx = action.txs[0];
+            if (action.chain === "LIGHTNING") {
+                console.log(`\nAction: SendToAddress`);
+                console.log(`  Lightning invoice: ${tx.address}`);
+                console.log(`  Amount: ${tx.amount}`);
+            } else if (action.chain === "BITCOIN") {
+                console.log(`\nAction: SendToAddress`);
+                console.log(`  Bitcoin address: ${tx.address}`);
+                console.log(`  Amount: ${tx.amount}`);
+            }
+            // User pays externally; script continues polling
+            return true;
+        }
+
+        case "Wait": {
+            console.log(`\nAction: Wait — ${action.name} (expected ~${action.expectedTimeSeconds}s)`);
+            return true;
+        }
+
+        default:
+            return false;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Main lifecycle
+// ---------------------------------------------------------------------------
+
+async function main() {
+    const startTime = Date.now();
+
+    // Create swap
+    const swap = await createSwap();
+    console.log(`\nSwap created:`);
+    console.log(`  swapId:      ${swap.swapId}`);
+    console.log(`  swapType:    ${swap.swapType}`);
+    console.log(`  inputAmount: ${swap.inputAmount}`);
+    console.log(`  outputAmount:${swap.outputAmount}`);
+    console.log(`  fees:        ${JSON.stringify(swap.fees)}`);
+    console.log(`  quoteExpiry: ${swap.quoteExpiry}`);
+
+    const swapId = swap.swapId;
+    let lastStateName = swap.state.name;
+    let lastActionType = swap.currentAction?.type;
+
+    // Handle initial action from createSwap response
+    await handleAction(swapId, swap.currentAction);
+
+    // Poll loop
+    let lastStatus = swap;
+    const deadline = Date.now() + TIMEOUT_MS;
+    while (Date.now() < deadline) {
+        // Use pollTimeSeconds from last action, or default 5s
+        const pollInterval = lastStatus.currentAction?.pollTimeSeconds
+            ? lastStatus.currentAction.pollTimeSeconds * 1000
+            : POLL_INTERVAL_DEFAULT;
+        await new Promise(r => setTimeout(r, pollInterval));
+
+        let status: any;
+        try {
+            status = await getSwapStatus(swapId);
+        } catch (e: any) {
+            console.error(`Poll error: ${e.message}`);
+            continue;
+        }
+        lastStatus = status;
+
+        // Print state transitions
+        if (status.state.name !== lastStateName) {
+            console.log(`\n[${lastStateName} → ${status.state.name}] ${status.state.description}`);
+            lastStateName = status.state.name;
+        }
+
+        // Check terminal states
+        if (status.isFinished) {
+            const durationSec = ((Date.now() - startTime) / 1000).toFixed(1);
+            if (status.isSuccess) {
+                console.log(`\nSwap completed successfully in ${durationSec}s.`);
+                process.exit(0);
+            } else {
+                console.error(`\nSwap failed after ${durationSec}s. State: ${status.state.description}`);
+                if (status.currentAction?.type === "Refund") {
+                    console.error("A refund step may be available.");
+                }
+                process.exit(1);
+            }
+        }
+
+        // Handle new actions (type changed)
+        if (status.currentAction?.type !== lastActionType) {
+            lastActionType = status.currentAction?.type;
+            await handleAction(swapId, status.currentAction);
+        }
+
+        // Handle requiresSecretReveal for Lightning swaps
+        if (status.requiresSecretReveal) {
+            console.log("Note: This swap requires a Lightning payment secret (pre-image) to proceed.");
+            console.log("Automated Lightning secret handling is not supported.");
+        }
+    }
+
+    // Timeout
+    console.error(`\nTimeout! Swap did not complete within ${TIMEOUT_MS / 60000} minutes.`);
+    console.error(`Last state: ${lastStateName}`);
+    process.exit(1);
+}
+
+main().catch(err => {
+    console.error("Error:", err.message);
+    process.exit(1);
+});
