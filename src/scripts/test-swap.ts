@@ -1,314 +1,182 @@
 import * as fs from "fs";
-import {Transaction, WIF} from "@scure/btc-signer";
-import {pubECDSA, TEST_NETWORK} from "@scure/btc-signer/utils";
-import {getAddress} from "@scure/btc-signer";
-import {ec, CallData, hash} from "starknet";
+import {SingleAddressBitcoinWallet, BitcoinNetwork} from "@atomiqlabs/sdk";
+import {StarknetKeypairWallet} from "@atomiqlabs/chain-starknet";
+import {Transaction} from "@scure/btc-signer";
+import {RpcProvider} from "starknet";
 
 const API_URL = process.env.API_URL || "http://localhost:3000";
 const POLL_INTERVAL_DEFAULT = 5000;
 const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
-// ---------------------------------------------------------------------------
-// Arg parsing
-// ---------------------------------------------------------------------------
-
-const args = process.argv.slice(2);
-if (args.length < 4) {
+// --- Arg parsing ---
+const [srcToken, dstToken, amount, amountType] = process.argv.slice(2);
+if (!srcToken || !dstToken || !amount || !amountType) {
     console.error("Usage: test-swap <srcToken> <dstToken> <amount> <amountType>");
-    console.error("  srcToken:   BTC | BTCLN | STRK");
-    console.error("  dstToken:   BTC | BTCLN | STRK");
-    console.error("  amount:     integer amount in base units (sats or fri)");
-    console.error("  amountType: EXACT_IN | EXACT_OUT");
+    console.error("Example: npx ts-node src/scripts/test-swap.ts BTC STRK 3000 EXACT_IN");
     process.exit(1);
 }
-
-const [srcToken, dstToken, amount, amountType] = args;
-
 if (amountType !== "EXACT_IN" && amountType !== "EXACT_OUT") {
-    console.error(`Invalid amountType '${amountType}'. Must be EXACT_IN or EXACT_OUT.`);
+    console.error("amountType must be EXACT_IN or EXACT_OUT");
     process.exit(1);
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+const isBtcToken = (t: string) => t === "BTC" || t === "BTCLN";
 
-function isBtcToken(t: string): boolean {
-    return t === "BTC" || t === "BTCLN";
-}
-
-// ---------------------------------------------------------------------------
-// Wallet loading
-// ---------------------------------------------------------------------------
-
-let btcPrivKey: Uint8Array | null = null;
-let btcPubKey: Uint8Array | null = null;
-let btcAddress: string | null = null;
-
-let starknetPrivKey: string | null = null;
-let starknetAddress: string | null = null;
+// --- Wallet loading (using SDK helpers) ---
+let btcWallet: SingleAddressBitcoinWallet | null = null;
+let starkWallet: StarknetKeypairWallet | null = null;
 
 if (isBtcToken(srcToken) || isBtcToken(dstToken)) {
-    const wifStr = fs.readFileSync("bitcoin.key", "utf8").trim();
-    // Try testnet WIF first; fall back to mainnet WIF (key file may use either format)
-    btcPrivKey = WIF(TEST_NETWORK).decode(wifStr);
-    btcPubKey = pubECDSA(btcPrivKey);
-    btcAddress = getAddress("wpkh", btcPrivKey, TEST_NETWORK) ?? null;
-    console.log(`Bitcoin wallet loaded. Address: ${btcAddress}`);
+    const wif = fs.readFileSync("bitcoin.key", "utf8").trim();
+    btcWallet = new SingleAddressBitcoinWallet(null as any, BitcoinNetwork.TESTNET, wif);
+    console.log(`Bitcoin wallet: ${btcWallet.getReceiveAddress()}`);
 }
 
 if (srcToken === "STRK" || dstToken === "STRK") {
-    const OZaccountClassHash = "0x00261c293c8084cd79086214176b33e5911677cec55104fddc8d25b0b736dcad";
-    starknetPrivKey = fs.readFileSync("starknet.key", "utf8").trim();
-    const publicKey = ec.starkCurve.getStarkKey(starknetPrivKey);
-    const constructorCallData = CallData.compile({publicKey});
-    starknetAddress = hash.calculateContractAddressFromHash(
-        publicKey,
-        OZaccountClassHash,
-        constructorCallData,
-        0
-    );
-    console.log(`Starknet wallet loaded. Address: ${starknetAddress}`);
+    const privKey = fs.readFileSync("starknet.key", "utf8").trim();
+    const rpc = new RpcProvider({nodeUrl: process.env.STARKNET_RPC || "https://starknet-sepolia.public.blastapi.io/rpc/v0_9"});
+    starkWallet = new StarknetKeypairWallet(rpc, privKey);
+    console.log(`Starknet wallet: ${starkWallet.address}`);
 }
 
-// ---------------------------------------------------------------------------
-// Address resolution
-// ---------------------------------------------------------------------------
+// --- Address resolution ---
+let srcAddress = "";
+let dstAddress = "";
 
-let srcAddress: string;
-let dstAddress: string;
-
-if (isBtcToken(srcToken) && dstToken === "STRK") {
-    // BTC/BTCLN → STRK
-    srcAddress = srcToken === "BTCLN" ? "" : (btcAddress ?? "");
-    dstAddress = starknetAddress ?? "";
-} else if (srcToken === "STRK" && isBtcToken(dstToken)) {
-    // STRK → BTC/BTCLN
-    srcAddress = starknetAddress ?? "";
-    dstAddress = dstToken === "BTCLN" ? "" : (btcAddress ?? "");
+if (isBtcToken(srcToken) && !isBtcToken(dstToken)) {
+    srcAddress = srcToken === "BTC" ? btcWallet!.getReceiveAddress() : "";
+    dstAddress = starkWallet!.address;
+} else if (!isBtcToken(srcToken) && isBtcToken(dstToken)) {
+    srcAddress = starkWallet!.address;
+    dstAddress = dstToken === "BTC" ? btcWallet!.getReceiveAddress() : "";
 } else {
-    console.error(`Unsupported token pair: ${srcToken} → ${dstToken}`);
+    console.error("One side must be BTC/BTCLN and the other a smart chain token");
     process.exit(1);
 }
 
-console.log(`srcAddress: ${srcAddress || "(empty)"}`);
-console.log(`dstAddress: ${dstAddress || "(empty)"}`);
-
-// ---------------------------------------------------------------------------
-// API helpers
-// ---------------------------------------------------------------------------
-
-async function apiPost(path: string, body: Record<string, unknown>): Promise<any> {
-    const url = `${API_URL}${path}`;
-    const response = await fetch(url, {
+// --- API helpers ---
+async function api(method: "GET" | "POST", path: string, data: Record<string, any>): Promise<any> {
+    const url = method === "GET"
+        ? `${API_URL}${path}?${new URLSearchParams(data).toString()}`
+        : `${API_URL}${path}`;
+    const res = await fetch(url, method === "POST" ? {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(body),
-    });
-    const json = await response.json();
-    if (!response.ok) {
-        throw new Error(`POST ${path} failed (${response.status}): ${JSON.stringify(json)}`);
-    }
+        body: JSON.stringify(data)
+    } : undefined);
+    const json: any = await res.json();
+    if (!res.ok) throw new Error(json.error || `${method} ${path} failed (${res.status})`);
     return json;
 }
 
-async function apiGet(path: string, params: Record<string, string>): Promise<any> {
-    const url = `${API_URL}${path}?${new URLSearchParams(params).toString()}`;
-    const response = await fetch(url);
-    const json = await response.json();
-    if (!response.ok) {
-        throw new Error(`GET ${path} failed (${response.status}): ${JSON.stringify(json)}`);
-    }
-    return json;
-}
-
-async function createSwap(): Promise<any> {
-    return apiPost("/createSwap", {
-        srcToken,
-        dstToken,
-        amount,
-        amountType,
-        srcAddress,
-        dstAddress,
-    });
-}
-
-async function getSwapStatus(swapId: string): Promise<any> {
+function getStatusParams(swapId: string): Record<string, string> {
     const params: Record<string, string> = {swapId};
-    if (btcAddress !== null) {
-        params.bitcoinAddress = btcAddress;
+    if (btcWallet) {
+        params.bitcoinAddress = btcWallet.getReceiveAddress();
+        params.bitcoinPublicKey = btcWallet.getPublicKey();
     }
-    if (btcPubKey !== null) {
-        params.bitcoinPublicKey = Buffer.from(btcPubKey).toString("hex");
-    }
-    return apiGet("/getSwapStatus", params);
+    return params;
 }
 
-async function submitTransaction(swapId: string, signedTxs: string[]): Promise<any> {
-    return apiPost("/submitTransaction", {swapId, signedTxs});
-}
-
-// ---------------------------------------------------------------------------
-// Signing functions
-// ---------------------------------------------------------------------------
-
-function signPsbt(psbtHex: string, signInputs: number[]): string {
-    const psbtBytes = Buffer.from(psbtHex, "hex");
-    const tx = Transaction.fromPSBT(psbtBytes);
-    for (const idx of signInputs) {
-        tx.signIdx(btcPrivKey!, idx);
-        tx.finalizeIdx(idx);
-    }
-    return Buffer.from(tx.extract()).toString("hex");
-}
-
-function signStarknetTx(serializedTx: string): string {
-    // The server handles Starknet transaction submission using the wallet's
-    // signing keys server-side. This function passes through the serialized
-    // transaction for use by the lifecycle loop.
-    console.log("Note: Starknet tx signing is handled server-side; passing through serialized tx.");
-    return serializedTx;
-}
-
-// ---------------------------------------------------------------------------
-// Action handler
-// ---------------------------------------------------------------------------
-
-async function handleAction(swapId: string, action: any): Promise<boolean> {
-    if (action == null) return false;
+// --- Action handler ---
+async function handleAction(swapId: string, action: any): Promise<void> {
+    if (!action) return;
 
     switch (action.type) {
         case "SignPSBT": {
-            console.log(`\nAction: SignPSBT`);
             const tx = action.txs[0];
+            console.log(`\nAction: SignPSBT (${action.name}) — type: ${tx.type}`);
             if (tx.type === "RAW_PSBT") {
-                console.error("Error: received RAW_PSBT — expected FUNDED_PSBT when bitcoin wallet params are passed.");
+                console.error("ERROR: Received RAW_PSBT — expected FUNDED_PSBT");
                 process.exit(1);
             }
-            // tx.type === "FUNDED_PSBT"
-            const signedHex = signPsbt(tx.psbtHex, tx.signInputs);
-            const result = await submitTransaction(swapId, [signedHex]);
-            console.log(`  TX hashes: ${JSON.stringify(result)}`);
-            return true;
+            const psbt = Transaction.fromPSBT(Buffer.from(tx.psbtHex, "hex"));
+            await btcWallet!.signPsbt(psbt as any, tx.signInputs);
+            const signedHex = Buffer.from(psbt.toPSBT()).toString("hex");
+            console.log("  Signing and submitting...");
+            const result = await api("POST", "/submitTransaction", {swapId, signedTxs: [signedHex]});
+            console.log(`  TX: ${result.txHashes?.join(", ")}`);
+            break;
         }
-
         case "SignSmartChainTransaction": {
-            console.log(`\nAction: SignSmartChainTransaction (${action.name})`);
-            const signedTxs = action.txs.map((tx: any) => signStarknetTx(tx));
-            const result = await submitTransaction(swapId, signedTxs);
-            console.log(`  TX hashes: ${JSON.stringify(result)}`);
-            return true;
+            console.log(`\nAction: ${action.name}`);
+            console.log("  Note: Starknet tx signing — passing through to server");
+            const result = await api("POST", "/submitTransaction", {swapId, signedTxs: action.txs});
+            console.log(`  TX: ${result.txHashes?.join(", ")}`);
+            break;
         }
-
         case "SendToAddress": {
             const tx = action.txs[0];
-            if (action.chain === "LIGHTNING") {
-                console.log(`\nAction: SendToAddress`);
-                console.log(`  Lightning invoice: ${tx.address}`);
-                console.log(`  Amount: ${tx.amount}`);
-            } else if (action.chain === "BITCOIN") {
-                console.log(`\nAction: SendToAddress`);
-                console.log(`  Bitcoin address: ${tx.address}`);
-                console.log(`  Amount: ${tx.amount}`);
-            }
-            // User pays externally; script continues polling
-            return true;
+            const label = action.chain === "LIGHTNING" ? "Lightning invoice" : "Bitcoin address";
+            console.log(`\nAction: ${action.name}`);
+            console.log(`  ${label}: ${tx.address}`);
+            console.log(`  Amount: ${tx.amount?.amount ?? tx.amount} ${tx.amount?.symbol ?? ""}`);
+            console.log("  (waiting for external payment...)");
+            break;
         }
-
         case "Wait": {
-            console.log(`\nAction: Wait — ${action.name} (expected ~${action.expectedTimeSeconds}s)`);
-            return true;
+            console.log(`  Waiting: ${action.name} (~${action.expectedTimeSeconds}s)`);
+            break;
         }
-
-        default:
-            return false;
     }
 }
 
-// ---------------------------------------------------------------------------
-// Main lifecycle
-// ---------------------------------------------------------------------------
-
+// --- Main ---
 async function main() {
     const startTime = Date.now();
+    console.log(`\nCreating swap: ${srcToken} → ${dstToken}, ${amount} (${amountType})`);
+    console.log(`  src: ${srcAddress || "(empty)"}  dst: ${dstAddress || "(empty)"}`);
 
-    // Create swap
-    const swap = await createSwap();
-    console.log(`\nSwap created:`);
-    console.log(`  swapId:      ${swap.swapId}`);
-    console.log(`  swapType:    ${swap.swapType}`);
-    console.log(`  inputAmount: ${swap.inputAmount}`);
-    console.log(`  outputAmount:${swap.outputAmount}`);
-    console.log(`  fees:        ${JSON.stringify(swap.fees)}`);
-    console.log(`  quoteExpiry: ${swap.quoteExpiry}`);
-
+    const swap = await api("POST", "/createSwap", {srcToken, dstToken, amount, amountType, srcAddress, dstAddress});
     const swapId = swap.swapId;
-    let lastStateName = swap.state.name;
-    let lastActionType = swap.currentAction?.type;
+    console.log(`\nSwap created: ${swapId.slice(0, 12)}... (${swap.swapType})`);
+    console.log(`  ${swap.quote.inputAmount.amount} ${swap.quote.inputAmount.symbol} → ${swap.quote.outputAmount.amount} ${swap.quote.outputAmount.symbol}`);
+    console.log(`  Fees: swap=${swap.quote.fees.swap.rawAmount} sats${swap.quote.fees.networkOutput ? `, network=${swap.quote.fees.networkOutput.rawAmount} sats` : ""}`);
+    console.log(`  Expires in ${Math.round((swap.quote.expiry - Date.now()) / 1000)}s`);
 
-    // Handle initial action from createSwap response
-    await handleAction(swapId, swap.currentAction);
+    // Get status with wallet params (to get FUNDED_PSBT instead of RAW_PSBT)
+    let status = await api("GET", "/getSwapStatus", getStatusParams(swapId));
+    let lastState = status.state.name;
+    let lastActionType = status.currentAction?.type;
+    await handleAction(swapId, status.currentAction);
 
     // Poll loop
-    let lastStatus = swap;
     const deadline = Date.now() + TIMEOUT_MS;
     while (Date.now() < deadline) {
-        // Use pollTimeSeconds from last action, or default 5s
-        const pollInterval = lastStatus.currentAction?.pollTimeSeconds
-            ? lastStatus.currentAction.pollTimeSeconds * 1000
-            : POLL_INTERVAL_DEFAULT;
-        await new Promise(r => setTimeout(r, pollInterval));
+        const interval = status.currentAction?.pollTimeSeconds ? status.currentAction.pollTimeSeconds * 1000 : POLL_INTERVAL_DEFAULT;
+        await new Promise(r => setTimeout(r, interval));
 
-        let status: any;
         try {
-            status = await getSwapStatus(swapId);
+            status = await api("GET", "/getSwapStatus", getStatusParams(swapId));
         } catch (e: any) {
-            console.error(`Poll error: ${e.message}`);
+            console.error(`  Poll error: ${e.message}`);
             continue;
         }
-        lastStatus = status;
 
-        // Print state transitions
-        if (status.state.name !== lastStateName) {
-            console.log(`\n[${lastStateName} → ${status.state.name}] ${status.state.description}`);
-            lastStateName = status.state.name;
+        if (status.state.name !== lastState) {
+            console.log(`\n[${lastState} → ${status.state.name}] ${status.state.description}`);
+            lastState = status.state.name;
         }
 
-        // Check terminal states
         if (status.isFinished) {
-            const durationSec = ((Date.now() - startTime) / 1000).toFixed(1);
+            const dur = ((Date.now() - startTime) / 1000).toFixed(0);
             if (status.isSuccess) {
-                console.log(`\nSwap completed successfully in ${durationSec}s.`);
+                console.log(`\nSwap completed in ${dur}s!`);
+                console.log(`  ${status.quote.inputAmount.amount} ${status.quote.inputAmount.symbol} → ${status.quote.outputAmount.amount} ${status.quote.outputAmount.symbol}`);
                 process.exit(0);
-            } else {
-                console.error(`\nSwap failed after ${durationSec}s. State: ${status.state.description}`);
-                if (status.currentAction?.type === "Refund") {
-                    console.error("A refund step may be available.");
-                }
-                process.exit(1);
             }
+            console.error(`\nSwap failed after ${dur}s: ${status.state.name} — ${status.state.description}`);
+            process.exit(1);
         }
 
-        // Handle new actions (type changed)
         if (status.currentAction?.type !== lastActionType) {
             lastActionType = status.currentAction?.type;
             await handleAction(swapId, status.currentAction);
         }
-
-        // Handle requiresSecretReveal for Lightning swaps
-        if (status.requiresSecretReveal) {
-            console.log("Note: This swap requires a Lightning payment secret (pre-image) to proceed.");
-            console.log("Automated Lightning secret handling is not supported.");
-        }
     }
 
-    // Timeout
-    console.error(`\nTimeout! Swap did not complete within ${TIMEOUT_MS / 60000} minutes.`);
-    console.error(`Last state: ${lastStateName}`);
+    console.error(`\nTimeout after ${TIMEOUT_MS / 60000}min. Last state: ${lastState}`);
     process.exit(1);
 }
 
-main().catch(err => {
-    console.error("Error:", err.message);
-    process.exit(1);
-});
+main().catch(e => { console.error("Error:", e.message); process.exit(1); });
