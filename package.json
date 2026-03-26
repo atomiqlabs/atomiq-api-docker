@@ -20,7 +20,8 @@
     "@atomiqlabs/sdk": "github:atomiqlabs/atomiq-sdk#api",
     "@atomiqlabs/storage-sqlite": "github:atomiqlabs/atomiq-storage-sqlite#develop",
     "dotenv": "^17.3.1",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "starknet": "^9.4.2"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
