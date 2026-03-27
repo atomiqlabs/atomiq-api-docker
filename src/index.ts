@@ -5,6 +5,9 @@ import {SqliteUnifiedStorage, SqliteStorageManager} from "@atomiqlabs/storage-sq
 import {StarknetInitializer} from "@atomiqlabs/chain-starknet";
 import {SwapperApi} from "@atomiqlabs/sdk/api";
 
+
+(global as any).atomiqLogLevel = 3;
+
 const port = process.env.PORT || 3000;
 const starknetRpc = process.env.STARKNET_RPC || "https://starknet-sepolia.public.blastapi.io/rpc/v0_9";
 const bitcoinNetwork = process.env.BITCOIN_NETWORK === "MAINNET" ? BitcoinNetwork.MAINNET : BitcoinNetwork.TESTNET;
