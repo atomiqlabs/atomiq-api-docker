@@ -6,7 +6,7 @@ import {RpcProvider} from "starknet";
 
 const API_URL = process.env.API_URL || "http://localhost:3000";
 const POLL_INTERVAL_DEFAULT = 5000;
-const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+const TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
 
 // --- Arg parsing ---
 const [srcToken, dstToken, amount, amountType] = process.argv.slice(2);
