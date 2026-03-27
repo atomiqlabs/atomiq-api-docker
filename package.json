@@ -17,7 +17,7 @@
   "license": "ISC",
   "dependencies": {
     "@atomiqlabs/chain-solana": "^13.1.0",
-    "@atomiqlabs/chain-starknet": "github:atomiqlabs/atomiq-chain-starknet#develop",
+    "@atomiqlabs/chain-starknet": "^8.1.13",
     "@atomiqlabs/sdk": "github:atomiqlabs/atomiq-sdk#api",
     "@atomiqlabs/storage-sqlite": "github:atomiqlabs/atomiq-storage-sqlite#develop",
     "@solana/web3.js": "^1.98.4",
