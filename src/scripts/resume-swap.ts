@@ -9,52 +9,31 @@ const POLL_INTERVAL_DEFAULT = 5000;
 const TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
 
 // --- Arg parsing ---
-const [srcToken, dstToken, amount, amountType] = process.argv.slice(2);
-if (!srcToken || !dstToken || !amount || !amountType) {
-    console.error("Usage: test-swap <srcToken> <dstToken> <amount> <amountType>");
-    console.error("Example: npx ts-node src/scripts/test-swap.ts BTC STRK 3000 EXACT_IN");
-    process.exit(1);
-}
-if (amountType !== "EXACT_IN" && amountType !== "EXACT_OUT") {
-    console.error("amountType must be EXACT_IN or EXACT_OUT");
+const swapId = process.argv[2];
+if (!swapId) {
+    console.error("Usage: resume-swap <swapId>");
+    console.error("Example: npx ts-node src/scripts/resume-swap.ts 85232492c45c...");
     process.exit(1);
 }
 
-const isBtcToken = (t: string) => t === "BTC" || t === "BTCLN";
-
-// --- Wallet loading (using SDK helpers) ---
+// --- Load wallets (if key files exist) ---
 let btcWallet: SingleAddressBitcoinWallet | null = null;
 let starkWallet: StarknetKeypairWallet | null = null;
 
-if (isBtcToken(srcToken) || isBtcToken(dstToken)) {
+if (fs.existsSync("bitcoin.key")) {
     const wif = fs.readFileSync("bitcoin.key", "utf8").trim();
     btcWallet = new SingleAddressBitcoinWallet(null as any, BitcoinNetwork.TESTNET, wif);
     console.log(`Bitcoin wallet: ${btcWallet.getReceiveAddress()}`);
 }
 
-if (srcToken === "STRK" || dstToken === "STRK") {
+if (fs.existsSync("starknet.key")) {
     const privKey = fs.readFileSync("starknet.key", "utf8").trim();
     const rpc = new RpcProvider({nodeUrl: process.env.STARKNET_RPC || "https://starknet-sepolia.public.blastapi.io/rpc/v0_9"});
     starkWallet = new StarknetKeypairWallet(rpc, privKey);
     console.log(`Starknet wallet: ${starkWallet.address}`);
 }
 
-// --- Address resolution ---
-let srcAddress = "";
-let dstAddress = "";
-
-if (isBtcToken(srcToken) && !isBtcToken(dstToken)) {
-    srcAddress = srcToken === "BTC" ? btcWallet!.getReceiveAddress() : "";
-    dstAddress = starkWallet!.address;
-} else if (!isBtcToken(srcToken) && isBtcToken(dstToken)) {
-    srcAddress = starkWallet!.address;
-    dstAddress = dstToken === "BTC" ? btcWallet!.getReceiveAddress() : "";
-} else {
-    console.error("One side must be BTC/BTCLN and the other a smart chain token");
-    process.exit(1);
-}
-
-// --- API helpers ---
+// --- API helper ---
 async function api(method: "GET" | "POST", path: string, data: Record<string, any>): Promise<any> {
     const url = method === "GET"
         ? `${API_URL}${path}?${new URLSearchParams(data).toString()}`
@@ -69,7 +48,7 @@ async function api(method: "GET" | "POST", path: string, data: Record<string, an
     return json;
 }
 
-function getStatusParams(swapId: string): Record<string, string> {
+function getStatusParams(): Record<string, string> {
     const params: Record<string, string> = {swapId};
     if (btcWallet) {
         params.bitcoinAddress = btcWallet.getReceiveAddress();
@@ -79,7 +58,7 @@ function getStatusParams(swapId: string): Record<string, string> {
 }
 
 // --- Action handler ---
-async function handleAction(swapId: string, action: any): Promise<void> {
+async function handleAction(action: any): Promise<void> {
     if (!action) return;
 
     switch (action.type) {
@@ -100,7 +79,6 @@ async function handleAction(swapId: string, action: any): Promise<void> {
         }
         case "SignSmartChainTransaction": {
             console.log(`\nAction: ${action.name}`);
-            console.log("  Note: Starknet tx signing — passing through to server");
             const result = await api("POST", "/submitTransaction", {swapId, signedTxs: action.txs});
             console.log(`  TX: ${result.txHashes?.join(", ")}`);
             break;
@@ -124,30 +102,47 @@ async function handleAction(swapId: string, action: any): Promise<void> {
 // --- Main ---
 async function main() {
     const startTime = Date.now();
-    console.log(`\nCreating swap: ${srcToken} → ${dstToken}, ${amount} (${amountType})`);
-    console.log(`  src: ${srcAddress || "(empty)"}  dst: ${dstAddress || "(empty)"}`);
+    console.log(`\nResuming swap: ${swapId}`);
 
-    const swap = await api("POST", "/createSwap", {srcToken, dstToken, amount, amountType, srcAddress, dstAddress});
-    const swapId = swap.swapId;
-    console.log(`\nSwap created: ${swapId} (${swap.swapType})`);
-    console.log(`  ${swap.quote.inputAmount.amount} ${swap.quote.inputAmount.symbol} → ${swap.quote.outputAmount.amount} ${swap.quote.outputAmount.symbol}`);
-    console.log(`  Fees: swap=${swap.quote.fees.swap.rawAmount} sats${swap.quote.fees.networkOutput ? `, network=${swap.quote.fees.networkOutput.rawAmount} sats` : ""}`);
-    console.log(`  Expires in ${Math.round((swap.quote.expiry - Date.now()) / 1000)}s`);
+    let status = await api("GET", "/getSwapStatus", getStatusParams());
 
-    // Get status with wallet params (to get FUNDED_PSBT instead of RAW_PSBT)
-    let status = await api("GET", "/getSwapStatus", getStatusParams(swapId));
+    // Print current state
+    console.log(`\nSwap status:`);
+    console.log(`  Type:    ${status.swapType}`);
+    console.log(`  State:   ${status.state.name} — ${status.state.description}`);
+    console.log(`  Input:   ${status.quote.inputAmount.amount} ${status.quote.inputAmount.symbol}`);
+    console.log(`  Output:  ${status.quote.outputAmount.amount} ${status.quote.outputAmount.symbol}`);
+    console.log(`  Finished: ${status.isFinished}  Success: ${status.isSuccess}  Failed: ${status.isFailed}  Expired: ${status.isExpired}`);
+
+    if (status.currentAction) {
+        console.log(`  Action:  ${status.currentAction.type} (${status.currentAction.name})`);
+    } else {
+        console.log(`  Action:  none`);
+    }
+
+    if (status.isFinished) {
+        if (status.isSuccess) {
+            console.log(`\nSwap already completed successfully!`);
+            process.exit(0);
+        }
+        console.error(`\nSwap already finished: ${status.state.name} — ${status.state.description}`);
+        process.exit(1);
+    }
+
+    // Handle current action if needed
     let lastState = status.state.name;
     let lastActionType = status.currentAction?.type;
-    await handleAction(swapId, status.currentAction);
+    await handleAction(status.currentAction);
 
     // Poll loop
+    console.log(`\nPolling for updates...`);
     const deadline = Date.now() + TIMEOUT_MS;
     while (Date.now() < deadline) {
         const interval = status.currentAction?.pollTimeSeconds ? status.currentAction.pollTimeSeconds * 1000 : POLL_INTERVAL_DEFAULT;
         await new Promise(r => setTimeout(r, interval));
 
         try {
-            status = await api("GET", "/getSwapStatus", getStatusParams(swapId));
+            status = await api("GET", "/getSwapStatus", getStatusParams());
         } catch (e: any) {
             console.error(`  Poll error: ${e.message}`);
             continue;
@@ -171,7 +166,7 @@ async function main() {
 
         if (status.currentAction?.type !== lastActionType) {
             lastActionType = status.currentAction?.type;
-            await handleAction(swapId, status.currentAction);
+            await handleAction(status.currentAction);
         }
     }
 
