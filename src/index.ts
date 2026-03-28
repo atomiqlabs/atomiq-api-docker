@@ -47,6 +47,7 @@ for (const [name, endpoint] of Object.entries(api.endpoints)) {
             );
             res.json(result);
         } catch (err: any) {
+            console.warn(err);
             res.status(400).json({error: err.message});
         }
     };

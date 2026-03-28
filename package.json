@@ -16,10 +16,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@atomiqlabs/chain-solana": "^13.1.0",
-    "@atomiqlabs/chain-starknet": "^8.1.13",
+    "@atomiqlabs/chain-solana": "github:atomiqlabs/atomiq-chain-solana#develop",
+    "@atomiqlabs/chain-starknet": "github:atomiqlabs/atomiq-chain-starknet#develop",
     "@atomiqlabs/sdk": "github:atomiqlabs/atomiq-sdk#api",
     "@atomiqlabs/storage-sqlite": "github:atomiqlabs/atomiq-storage-sqlite#develop",
+    "@scure/btc-signer": "1.7",
     "@solana/web3.js": "^1.98.4",
     "dotenv": "^17.3.1",
     "ethers": "^6.16.0",
