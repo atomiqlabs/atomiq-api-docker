@@ -1,6 +1,5 @@
 import {Transaction} from "@scure/btc-signer";
 import {bitcoinWallet, evmWallet, solanaWallet, starknetWallet, starknetWalletDeloymentPayload} from "./libs/wallets";
-import {json} from "starknet";
 import {Buffer} from "buffer";
 import {Keypair, Transaction as SolanaTransaction} from "@solana/web3.js";
 import {Transaction as EthersTransaction} from "ethers";

@@ -58,7 +58,7 @@ const bitcoinPublicKey = Buffer.from(pubECDSA(bitcoinPrivateKey)).toString("hex"
 const bitcoinWallet = {
     privateKey: bitcoinPrivateKey,
     publicKey: bitcoinPublicKey,
-    address: getAddress("wpkh", bitcoinPrivateKey, process.env.BITCOIN_NETWORK==="MAINNET" ? NETWORK : TEST_NETWORK)
+    address: getAddress("wpkh", bitcoinPrivateKey, process.env.BITCOIN_NETWORK==="MAINNET" ? NETWORK : TEST_NETWORK)!
 };
 console.log("Bitcoin wallet address: "+bitcoinWallet.address);
 
