@@ -22,7 +22,7 @@ function getAddressForToken(tokenId: string) {
 }
 // NOTE: When using LNUR:-pay or LNURL-withdraw links prefer to handle the LNURL part on the client-side, this
 //  minimizes the dependency and trust required on the side of the server
-async function main(srcToken: string, dstToken: string, amount: string, amountType: string, destinationAddress?: string) {
+export async function createSwap(srcToken: string, dstToken: string, amount: string, amountType: string, destinationAddress?: string): Promise<{swapId: string, swapSecret?: string}> {
     const srcAddress = getAddressForToken(srcToken); // Get the internal wallet for the source chain
     const dstAddress = destinationAddress ?? getAddressForToken(dstToken); // Get the internal wallet for the destination chain
 
@@ -62,14 +62,18 @@ async function main(srcToken: string, dstToken: string, amount: string, amountTy
         console.log("\nSince you are swapping from lightning, also pass the following secret to the process function:");
         console.log(swapSecret);
     }
+
+    return {swapId, swapSecret};
 }
 
 // Handle command line arguments
 // Always use chain prefix for a given token!
-const [srcToken, dstToken, amount, amountType, destinationAddress] = process.argv.slice(2);
-if (!srcToken || !dstToken || !amount || !amountType) {
-    console.error("Usage: test-swap <srcToken> <dstToken> <amount> <amountType> [destinationAddress]");
-    console.error("Example: npx ts-node src/scripts/test-swap.ts BITCOIN-BTC STARKNET-STRK 3000 EXACT_IN");
-} else {
-    main(srcToken, dstToken, amount, amountType, destinationAddress).catch(e => console.error(e));
+if(require.main === module) {
+    const [srcToken, dstToken, amount, amountType, destinationAddress] = process.argv.slice(2);
+    if (!srcToken || !dstToken || !amount || !amountType) {
+        console.error("Usage: test-swap <srcToken> <dstToken> <amount> <amountType> [destinationAddress]");
+        console.error("Example: npx ts-node src/scripts/test-swap.ts BITCOIN-BTC STARKNET-STRK 3000 EXACT_IN");
+    } else {
+        createSwap(srcToken, dstToken, amount, amountType, destinationAddress).catch(e => console.error(e));
+    }
 }

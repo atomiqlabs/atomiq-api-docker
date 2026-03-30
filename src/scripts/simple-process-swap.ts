@@ -6,7 +6,7 @@ import {Transaction as EthersTransaction} from "ethers";
 
 const API_URL = process.env.API_URL || "http://localhost:3000";
 
-async function main(swapId: string, swapSecret?: string) {
+export async function processSwap(swapId: string, swapSecret?: string): Promise<void> {
     // Polling loop
     let shouldRevealSecret: boolean = false;
     let lastState: string | undefined;
@@ -165,11 +165,13 @@ async function main(swapId: string, swapSecret?: string) {
 }
 
 // Handle command line arguments
-const swapId = process.argv[2];
-const swapSecret = process.argv[3];
-if (!swapId) {
-    console.error("Usage: resume-swap <swapId> [swapSecret]");
-    console.error("Example: npx ts-node src/scripts/resume-swap.ts 85232492c45c...");
-} else {
-    main(swapId, swapSecret).catch(e => console.error(e));
+if(require.main === module) {
+    const swapId = process.argv[2];
+    const swapSecret = process.argv[3];
+    if (!swapId) {
+        console.error("Usage: resume-swap <swapId> [swapSecret]");
+        console.error("Example: npx ts-node src/scripts/resume-swap.ts 85232492c45c...");
+    } else {
+        processSwap(swapId, swapSecret).catch(e => console.error(e));
+    }
 }
