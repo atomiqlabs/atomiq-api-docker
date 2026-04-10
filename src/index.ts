@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import morgan from "morgan";
 import {SwapperFactory, BitcoinNetwork} from "@atomiqlabs/sdk";
 import {SqliteUnifiedStorage, SqliteStorageManager} from "@atomiqlabs/storage-sqlite";
 import {StarknetInitializer} from "@atomiqlabs/chain-starknet";
@@ -35,6 +36,7 @@ const swapper = Factory.newSwapper({
 const api = new SwapperApi(swapper);
 
 const app = express();
+app.use(morgan("combined"));
 app.use(express.json());
 
 // Health check
