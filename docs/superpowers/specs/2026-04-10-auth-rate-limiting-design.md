@@ -146,8 +146,7 @@ Request arrives
 ```
 
 **Rate limit details:**
-- Each distinct rate limit config (global + each override) gets its own bucket pool
-- Buckets keyed by client IP address
+- Single rate limit bucket keyed by client IP address, the actual rate limits of the request apply
 - In-memory storage (no Redis — single-instance Docker container)
 
 ### Startup Behavior
@@ -192,7 +191,7 @@ Request arrives
 
 ### Dependencies
 
-- `js-yaml` + `@types/js-yaml` — YAML parsing
+- `yaml` — YAML parsing
 - `jsonwebtoken` + `@types/jsonwebtoken` — JWT signature verification
 - `express-rate-limit` — Express rate limiter
 
