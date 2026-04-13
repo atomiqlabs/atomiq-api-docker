@@ -32,13 +32,34 @@ export interface NoneAuthEntry {
 
 export type AuthEntry = ApiKeyAuthEntry | JwtAuthEntry | NoneAuthEntry;
 
+export interface CorsConfig {
+    origin: string | string[];
+    methods?: string[];
+    allowedHeaders?: string[];
+}
+
+export type LogLevel = "error" | "warn" | "info" | "debug";
+
+const LOG_LEVEL_MAP: Record<LogLevel, number> = {
+    error: 0,
+    warn: 1,
+    info: 2,
+    debug: 3,
+};
+
+export function logLevelToNumber(level: LogLevel): number {
+    return LOG_LEVEL_MAP[level];
+}
+
 export interface Config {
     port: number;
     starknetRpc: string | null;
     solanaRpc: string | null;
     bitcoinNetwork: "TESTNET" | "MAINNET";
+    logLevel: LogLevel;
     rateLimit: RateLimitConfig;
     auth: AuthEntry[];
+    cors: CorsConfig | null;
 }
 
 export function loadConfig(): Config {
@@ -62,6 +83,11 @@ export function loadConfig(): Config {
 
     if (!doc.bitcoinNetwork || !["TESTNET", "MAINNET"].includes(doc.bitcoinNetwork)) {
         throw new Error("config.yaml: 'bitcoinNetwork' must be TESTNET or MAINNET");
+    }
+
+    const validLogLevels = ["error", "warn", "info", "debug"];
+    if (doc.logLevel !== undefined && !validLogLevels.includes(doc.logLevel)) {
+        throw new Error(`config.yaml: 'logLevel' must be one of: ${validLogLevels.join(", ")}`);
     }
 
     if (!doc.rateLimit || typeof doc.rateLimit.windowMs !== "number" || typeof doc.rateLimit.maxRequests !== "number") {
@@ -99,12 +125,23 @@ export function loadConfig(): Config {
         }
     }
 
+    // Validate cors if present
+    let cors: CorsConfig | null = null;
+    if (doc.cors != null) {
+        if (typeof doc.cors.origin !== "string" && !Array.isArray(doc.cors.origin)) {
+            throw new Error("config.yaml: 'cors.origin' must be a string or array of strings");
+        }
+        cors = doc.cors;
+    }
+
     return {
         port: doc.port,
         starknetRpc: doc.starknetRpc ?? null,
         solanaRpc: doc.solanaRpc ?? null,
         bitcoinNetwork: doc.bitcoinNetwork,
+        logLevel: doc.logLevel ?? "info",
         rateLimit: doc.rateLimit,
         auth: doc.auth,
+        cors,
     };
 }

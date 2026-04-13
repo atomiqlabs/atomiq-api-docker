@@ -1,10 +1,17 @@
 # Server
 port: 3000
+logLevel: info   # error | warn | info | debug
 
 # Chains (set to null to disable a chain)
 starknetRpc: "https://starknet-sepolia.g.alchemy.com/..."
 solanaRpc: "https://api.devnet.solana.com"
 bitcoinNetwork: TESTNET   # TESTNET | MAINNET
+
+# CORS (omit or set to null to disable)
+cors:
+  origin: "*"                                          # or ["https://app.example.com"]
+  methods: ["GET", "POST"]                             # optional
+  allowedHeaders: ["Content-Type", "Authorization", "x-api-key"]  # optional
 
 # Global rate limit (applies when no auth-based override matches)
 rateLimit:

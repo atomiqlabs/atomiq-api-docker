@@ -6,14 +6,15 @@ import {SqliteUnifiedStorage, SqliteStorageManager} from "@atomiqlabs/storage-sq
 import {StarknetInitializer} from "@atomiqlabs/chain-starknet";
 import {SwapperApi} from "@atomiqlabs/sdk/api";
 import {SolanaInitializer} from "@atomiqlabs/chain-solana";
-import {loadConfig} from "./config";
+import cors from "cors";
+import {loadConfig, logLevelToNumber} from "./config";
 import {createAuthMiddleware} from "./auth";
 import {createRateLimitMiddleware} from "./rateLimit";
 
 
-(global as any).atomiqLogLevel = 3;
-
 const config = loadConfig();
+
+(global as any).atomiqLogLevel = logLevelToNumber(config.logLevel);
 
 const bitcoinNetwork = config.bitcoinNetwork === "MAINNET" ? BitcoinNetwork.MAINNET : BitcoinNetwork.TESTNET;
 
@@ -40,6 +41,9 @@ const api = new SwapperApi(swapper);
 const app = express();
 app.use(morgan("combined"));
 app.use(express.json());
+if (config.cors) {
+    app.use(cors(config.cors));
+}
 
 // Health check (before auth — always accessible)
 app.get("/health", (_req, res) => {
@@ -78,6 +82,7 @@ async function main() {
     await api.init();
     console.log("SwapperApi initialized.");
 
+    console.log(`Log level: ${config.logLevel} (${logLevelToNumber(config.logLevel)})`);
     console.log(`Auth paths: ${config.auth.length}`);
     console.log(`Global rate limit: ${config.rateLimit.maxRequests} req / ${config.rateLimit.windowMs}ms`);
     console.log(`Chains: Starknet=${config.starknetRpc ? "enabled" : "disabled"}, Solana=${config.solanaRpc ? "enabled" : "disabled"}`);
