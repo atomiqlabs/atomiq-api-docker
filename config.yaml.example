@@ -1,0 +1,49 @@
+# Server
+port: 3000
+
+# Chains (set to null to disable a chain)
+starknetRpc: "https://starknet-sepolia.g.alchemy.com/..."
+solanaRpc: "https://api.devnet.solana.com"
+bitcoinNetwork: TESTNET   # TESTNET | MAINNET
+
+# Global rate limit (applies when no auth-based override matches)
+rateLimit:
+  windowMs: 60000
+  maxRequests: 10
+
+# Auth paths — ordered array, first match wins
+auth:
+  # Backend-to-backend: API key with no rate limit
+  - type: apiKey
+    name: "Wallet Backend"
+    apiKey: "your-api-key-here"
+    header: x-api-key              # optional, defaults to x-api-key
+    rateLimit: null                 # null = no rate limit
+
+  # JWT auth with elevated rate limit
+  - type: jwt
+    name: "Premium Users"
+    publicKey: "-----BEGIN PUBLIC KEY-----\nYOUR_PUBLIC_KEY_HERE\n-----END PUBLIC KEY-----"
+    algorithms: [RS256]
+    claims:                         # optional JWT claim matching
+      user_tier: "swapper"
+    rateLimit:
+      windowMs: 60000
+      maxRequests: 200
+
+  # JWT auth with array-includes claim matching
+  # - type: jwt
+  #   name: "Standard Users"
+  #   publicKey: "-----BEGIN PUBLIC KEY-----\nYOUR_PUBLIC_KEY_HERE\n-----END PUBLIC KEY-----"
+  #   algorithms: [RS256]
+  #   claims:
+  #     permissions:
+  #       includes: "swap_permission"
+  #   rateLimit:
+  #     windowMs: 60000
+  #     maxRequests: 60
+
+  # Public access (uses global rate limit)
+  - type: none
+    name: "Public"
+    # no rateLimit specified = uses global rateLimit
