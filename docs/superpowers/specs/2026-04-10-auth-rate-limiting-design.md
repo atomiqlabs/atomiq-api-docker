@@ -9,143 +9,192 @@ The atomiq-api-docker Express server exposes all swap endpoints publicly with no
 
 1. Backend-to-backend auth (wallet backend -> swap API)
 2. End-user auth (wallet client -> swap API)
-3. Per-auth-path rate limiting
-4. Backwards compatibility (no config = current behavior)
+3. Configurable rate limiting (global default + per-auth overrides)
 
-## Design: Single Middleware with Flat Config Array
+## Design: Unified YAML Config + Separated Auth & Rate Limit Middlewares
 
 ### Overview
 
-A single Express middleware runs before all routes. It checks an ordered array of auth path configs. First match wins. Each auth path has its own rate limit settings.
+A unified `config.yaml` replaces the current `.env` for all server configuration. Two separate middlewares handle concerns independently:
 
-### Auth Types
+1. **Auth middleware** — resolves which auth path matched, attaches metadata (including rate limit override) to the request
+2. **Rate limit middleware** — reads the metadata; applies the override if present, otherwise falls back to the global rate limit
 
-**API Key** — Static string in config. Checked via request header. Intended for server-to-server communication where the key stays hidden on the backend.
+### Unified Configuration
 
-**JWT** — Verify-only (we never generate tokens). Configured with a public key. Accepts any JWT signed by that key. Intended for end-user clients. Multiple JWT entries with different keys enable tiered access (e.g., premium vs standard users).
+File: `config.yaml` in the project root.
 
-**None** — Catch-all for unauthenticated access. Typically paired with a very restrictive rate limit.
+```yaml
+# Server
+port: 3000
 
-### Configuration
+# Chains
+starknetRpc: "https://starknet-sepolia.g.alchemy.com/..."
+solanaRpc: "https://api.devnet.solana.com"
+bitcoinNetwork: TESTNET   # TESTNET | MAINNET
 
-File: `auth.config.json` in the project root (hardcoded path, no env var).
+# Global rate limit (applies when no auth-based override matches)
+rateLimit:
+  windowMs: 60000
+  maxRequests: 10
 
-```jsonc
-{
-  "auth": [
-    {
-      "type": "apiKey",
-      "name": "Wallet Backend",
-      "apiKey": "sk_live_abc123...",
-      "header": "x-api-key",
-      "rateLimit": null
-    },
-    {
-      "type": "jwt",
-      "name": "Premium Users",
-      "publicKey": "-----BEGIN PUBLIC KEY-----\n...",
-      "algorithms": ["RS256"],
-      "rateLimit": {
-        "windowMs": 60000,
-        "maxRequests": 200
-      }
-    },
-    {
-      "type": "jwt",
-      "name": "Standard Users",
-      "publicKey": "-----BEGIN PUBLIC KEY-----\n...",
-      "algorithms": ["RS256"],
-      "rateLimit": {
-        "windowMs": 60000,
-        "maxRequests": 60
-      }
-    },
-    {
-      "type": "none",
-      "name": "Public",
-      "rateLimit": {
-        "windowMs": 60000,
-        "maxRequests": 10
-      }
-    }
-  ]
-}
+# Auth paths — ordered array, first match wins
+auth:
+  - type: apiKey
+    name: "Wallet Backend"
+    apiKey: "sk_live_abc123..."
+    header: x-api-key              # optional, defaults to x-api-key
+    rateLimit: null                 # null = no rate limit
+
+  - type: jwt
+    name: "Premium Users"
+    publicKey: "-----BEGIN PUBLIC KEY-----\n..."
+    algorithms: [RS256]
+    claims:                         # optional JWT claim matching
+      user_tier: "swapper"
+    rateLimit:
+      windowMs: 60000
+      maxRequests: 200
+
+  - type: jwt
+    name: "Standard Users"
+    publicKey: "-----BEGIN PUBLIC KEY-----\n..."
+    algorithms: [RS256]
+    claims:
+      permissions:
+        includes: "swap_permission"
+    rateLimit:
+      windowMs: 60000
+      maxRequests: 60
+
+  - type: none
+    name: "Public"
+    # no rateLimit specified = uses global rateLimit
 ```
 
-**Config rules:**
-- `type`: `"apiKey"` | `"jwt"` | `"none"`
-- `name`: Label for logging (identifies which path matched)
-- `rateLimit`: Object with `windowMs` and `maxRequests`, or `null` to disable
-- `header`: For apiKey type, which header to check (defaults to `x-api-key`)
-- `algorithms`: For JWT type, allowed signing algorithms
-- Array order matters: first successful match applies
-- Multiple entries of the same type are supported (e.g., multiple JWT tiers)
+### Config Rules
 
-### Middleware Flow
+**Top-level fields:**
+- `port`: Server port (required)
+- `starknetRpc`, `solanaRpc`: Chain RPC URLs (null to disable a chain)
+- `bitcoinNetwork`: `TESTNET` or `MAINNET`
+- `rateLimit`: Global default rate limit applied to all requests unless overridden
+
+**Auth entry fields:**
+- `type`: `"apiKey"` | `"jwt"` | `"none"`
+- `name`: Label for logging
+- `rateLimit`: Override for this auth path. Three states:
+  - Object `{ windowMs, maxRequests }` — use this specific limit
+  - `null` — no rate limit at all
+  - Omitted — fall back to global `rateLimit`
+- `header` (apiKey only): Which header to check. Defaults to `x-api-key`
+- `publicKey` (jwt only): PEM-encoded public key for signature verification
+- `algorithms` (jwt only): Allowed signing algorithms (e.g., `[RS256]`)
+- `claims` (jwt only): Optional claim matchers (see below)
+
+**Array order matters:** first successful match applies. Multiple entries of the same type supported.
+
+### JWT Claim Matching
+
+The optional `claims` field lets you constrain which JWTs are accepted beyond just signature verification. Two match modes:
+
+**Exact match** — claim value must equal the specified value:
+```yaml
+claims:
+  user_tier: "swapper"        # jwt.user_tier === "swapper"
+  role: "admin"               # jwt.role === "admin"
+```
+
+**Array includes** — claim array must contain the specified value:
+```yaml
+claims:
+  permissions:
+    includes: "swap_permission"   # jwt.permissions.includes("swap_permission")
+```
+
+Both can be combined. All specified claims must match (AND logic). If `claims` is omitted, any valid JWT signed by the public key is accepted.
+
+### Middleware Architecture
+
+Two middlewares, applied in order before all routes:
 
 ```
 Request arrives
     |
-For each auth entry in config (in order):
+[Auth Middleware]
     |
-    apiKey? -> Check header matches -> if yes: MATCHED
-    jwt?    -> Check Bearer token, verify signature -> if yes: MATCHED
-    none?   -> Always matches (catch-all)
+    For each auth entry (in order):
+      apiKey? -> check header value
+      jwt?    -> verify signature + check claims
+      none?   -> always matches
     |
-If MATCHED:
-    -> Apply that entry's rate limit (if configured)
-    -> Rate limit exceeded? -> 429 Too Many Requests
-    -> Otherwise -> attach auth info to req, continue to route
+    MATCHED -> attach to req:
+      req.auth = { name, type }
+      req.rateLimitOverride = entry's rateLimit value (object, null, or undefined)
     |
-If NO MATCH (all entries tried, none matched):
-    -> 401 Unauthorized
+    NO MATCH -> 401 Unauthorized (stop here)
+    |
+[Rate Limit Middleware]
+    |
+    Read req.rateLimitOverride:
+      object  -> apply that specific limit
+      null    -> skip rate limiting entirely
+      undefined -> apply global rateLimit from config
+    |
+    Rate limit exceeded? -> 429 Too Many Requests
+    Otherwise -> continue to route handler
 ```
 
-**Behaviors:**
-- Empty config array or missing config file: all requests pass through (backwards compatible)
-- Auth info attached to `req.auth = { name, type }` for downstream logging
-- Each auth entry gets its own independent rate limit bucket
-- Rate limit buckets keyed by client IP address
-- Rate limiting is in-memory (no Redis — single-instance Docker container)
-- JWT verification uses `jsonwebtoken` library
-- Rate limiting uses `express-rate-limit` library
+**Rate limit details:**
+- Each distinct rate limit config (global + each override) gets its own bucket pool
+- Buckets keyed by client IP address
+- In-memory storage (no Redis — single-instance Docker container)
 
 ### Startup Behavior
 
-- `auth.config.json` exists: load, validate, log auth path count
-- `auth.config.json` missing: no auth, no rate limiting (current behavior)
-- `auth.config.json` malformed: fail fast with clear error
+- `config.yaml` is required — server fails fast with a clear error if missing or malformed
+- Validated at startup: required fields present, auth entries well-formed, JWT public keys parseable
+- Logs: port, enabled chains, auth path count, global rate limit
 
 ### Response Codes
 
 | Scenario | Status | Body |
 |----------|--------|------|
 | No auth entry matched | 401 | `{"error": "Unauthorized"}` |
-| JWT malformed/expired/wrong sig | 401 | `{"error": "Unauthorized"}` |
+| JWT invalid/expired/claims mismatch | 401 | `{"error": "Unauthorized"}` |
 | Rate limit exceeded | 429 | `{"error": "Rate limit exceeded", "retryAfter": <seconds>}` |
 | Auth matched, within limit | Pass through to route handler |
 
 ### File Changes
 
-1. **`src/auth.ts`** (new) — Auth middleware module:
-   - Loads and validates `auth.config.json` at startup
-   - Exports a single middleware function
-   - Contains match logic (apiKey check, JWT verify, none)
-   - Creates per-entry rate limiters
-   - Attaches `req.auth` with `{ name, type }`
+1. **`src/config.ts`** (new) — Config loader:
+   - Reads and validates `config.yaml`
+   - Exports typed config object used by index.ts, auth, and rate limiter
 
-2. **`src/index.ts`** (modify) — Wire up middleware:
-   - Import and apply auth middleware before route registration
-   - Minimal change (~3 lines)
+2. **`src/auth.ts`** (new) — Auth middleware:
+   - Iterates auth entries, matches request
+   - Attaches `req.auth` and `req.rateLimitOverride`
+   - Returns 401 on no match
 
-3. **`auth.config.json.example`** (new) — Example config for operators:
-   - Shows all three auth types
-   - Operators copy to `auth.config.json` and customize
+3. **`src/rateLimit.ts`** (new) — Rate limit middleware:
+   - Reads `req.rateLimitOverride`
+   - Applies appropriate rate limit or skips
+   - Returns 429 when exceeded
+
+4. **`src/index.ts`** (modify) — Wire up:
+   - Replace `.env` reads with config object
+   - Apply auth middleware, then rate limit middleware, before routes
+   - Remove dotenv import
+
+5. **`config.yaml.example`** (new) — Example config for operators
+
+6. **`.env` / `.env.example`** (remove) — Replaced by config.yaml
 
 ### Dependencies
 
+- `js-yaml` + `@types/js-yaml` — YAML parsing
 - `jsonwebtoken` + `@types/jsonwebtoken` — JWT signature verification
-- `express-rate-limit` — Proven Express rate limiter
+- `express-rate-limit` — Express rate limiter
 
 ### Out of Scope
 
