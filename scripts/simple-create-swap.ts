@@ -72,7 +72,7 @@ if(require.main === module) {
     const [srcToken, dstToken, amount, amountType, destinationAddress] = process.argv.slice(2);
     if (!srcToken || !dstToken || !amount || !amountType) {
         console.error("Usage: test-swap <srcToken> <dstToken> <amount> <amountType> [destinationAddress]");
-        console.error("Example: npx ts-node src/scripts/test-swap.ts BITCOIN-BTC STARKNET-STRK 3000 EXACT_IN");
+        console.error("Example: npx ts-node scripts/simple-create-swap.ts BITCOIN-BTC STARKNET-STRK 3000 EXACT_IN");
     } else {
         createSwap(srcToken, dstToken, amount, amountType, destinationAddress).catch(e => console.error(e));
     }

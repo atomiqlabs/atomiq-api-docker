@@ -170,7 +170,7 @@ if(require.main === module) {
     const swapSecret = process.argv[3];
     if (!swapId) {
         console.error("Usage: resume-swap <swapId> [swapSecret]");
-        console.error("Example: npx ts-node src/scripts/resume-swap.ts 85232492c45c...");
+        console.error("Example: npx ts-node scripts/simple-process-swap.ts 85232492c45c...");
     } else {
         processSwap(swapId, swapSecret).catch(e => console.error(e));
     }

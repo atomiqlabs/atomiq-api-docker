@@ -6,9 +6,10 @@ WORKDIR /src
 ADD src ./src
 ADD package.json .
 ADD tsconfig.json .
+ADD tsconfig.api.json .
 RUN git config --global url."https://".insteadOf ssh://
 RUN npm install
-RUN tsc
+RUN npm run build:api
 RUN npm prune --omit=dev
 RUN mv node_modules/yaml _yaml
 RUN node-prune

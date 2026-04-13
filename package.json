@@ -4,10 +4,12 @@
   "description": "atomiq-api-docker",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "npm run build:api && npm run build:scripts",
+    "build:api": "tsc -p tsconfig.api.json",
+    "build:scripts": "tsc -p tsconfig.scripts.json",
     "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts",
-    "test:harness": "ts-node src/scripts/test-harness.ts"
+    "dev": "ts-node --project tsconfig.api.json src/index.ts",
+    "test:harness": "ts-node --project tsconfig.scripts.json scripts/test-harness.ts"
   },
   "repository": {
     "type": "git",
