@@ -42,7 +42,7 @@ export interface Config {
 }
 
 export function loadConfig(): Config {
-    const configPath = path.resolve(process.cwd(), "config.yaml");
+    const configPath = process.env.CONFIG_PATH || path.resolve(process.cwd(), "config.yaml");
 
     let raw: string;
     try {
