@@ -1,4 +1,3 @@
-import "dotenv/config";
 import express from "express";
 import morgan from "morgan";
 import {SwapperFactory, BitcoinNetwork} from "@atomiqlabs/sdk";
@@ -6,14 +5,16 @@ import {SqliteUnifiedStorage, SqliteStorageManager} from "@atomiqlabs/storage-sq
 import {StarknetInitializer} from "@atomiqlabs/chain-starknet";
 import {SwapperApi} from "@atomiqlabs/sdk/api";
 import {SolanaInitializer} from "@atomiqlabs/chain-solana";
+import {loadConfig} from "./config";
+import {createAuthMiddleware} from "./auth";
+import {createRateLimitMiddleware} from "./rateLimit";
 
 
 (global as any).atomiqLogLevel = 3;
 
-const port = process.env.PORT || 3000;
-const starknetRpc = process.env.STARKNET_RPC;
-const solanaRpc = process.env.SOLANA_RPC;
-const bitcoinNetwork = process.env.BITCOIN_NETWORK === "MAINNET" ? BitcoinNetwork.MAINNET : BitcoinNetwork.TESTNET;
+const config = loadConfig();
+
+const bitcoinNetwork = config.bitcoinNetwork === "MAINNET" ? BitcoinNetwork.MAINNET : BitcoinNetwork.TESTNET;
 
 const chains = [StarknetInitializer, SolanaInitializer] as const;
 
@@ -21,11 +22,11 @@ const Factory = new SwapperFactory(chains);
 
 const swapper = Factory.newSwapper({
     chains: {
-        STARKNET: starknetRpc==null ? null! : {
-            rpcUrl: starknetRpc
+        STARKNET: config.starknetRpc == null ? null! : {
+            rpcUrl: config.starknetRpc
         },
-        SOLANA: solanaRpc==null ? null! : {
-            rpcUrl: solanaRpc
+        SOLANA: config.solanaRpc == null ? null! : {
+            rpcUrl: config.solanaRpc
         }
     },
     bitcoinNetwork,
@@ -39,10 +40,14 @@ const app = express();
 app.use(morgan("combined"));
 app.use(express.json());
 
-// Health check
+// Health check (before auth — always accessible)
 app.get("/health", (_req, res) => {
     res.json({status: "ok"});
 });
+
+// Auth + Rate limiting
+app.use(createAuthMiddleware(config));
+app.use(createRateLimitMiddleware(config.rateLimit));
 
 // Wire up SwapperApi endpoints
 for (const [name, endpoint] of Object.entries(api.endpoints)) {
@@ -72,8 +77,13 @@ async function main() {
     await api.init();
     console.log("SwapperApi initialized.");
 
-    app.listen(port, () => {
-        console.log(`atomiq-api listening on port ${port}`);
+    console.log(`Auth paths: ${config.auth.length}`);
+    console.log(`Global rate limit: ${config.rateLimit.maxRequests} req / ${config.rateLimit.windowMs}ms`);
+    console.log(`Chains: Starknet=${config.starknetRpc ? "enabled" : "disabled"}, Solana=${config.solanaRpc ? "enabled" : "disabled"}`);
+    console.log(`Bitcoin network: ${config.bitcoinNetwork}`);
+
+    app.listen(config.port, () => {
+        console.log(`atomiq-api listening on port ${config.port}`);
     });
 }
 
