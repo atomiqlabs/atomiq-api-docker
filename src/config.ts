@@ -38,6 +38,11 @@ export interface CorsConfig {
     allowedHeaders?: string[];
 }
 
+export interface HttpsConfig {
+    keyPath: string;
+    certPath: string;
+}
+
 export type LogLevel = "error" | "warn" | "info" | "debug";
 
 const LOG_LEVEL_MAP: Record<LogLevel, 0 | 1 | 2 | 3> = {
@@ -69,6 +74,14 @@ export interface Config {
     rateLimit: RateLimitConfig;
     auth: AuthEntry[];
     cors: CorsConfig | null;
+    https: HttpsConfig | null;
+}
+
+function resolveConfigPath(configPath: string, filePath: string): string {
+    if (path.isAbsolute(filePath)) {
+        return filePath;
+    }
+    return path.resolve(path.dirname(configPath), filePath);
 }
 
 export function loadConfig(): Config {
@@ -150,6 +163,20 @@ export function loadConfig(): Config {
         throw new Error("config.yaml: 'reloadLpIntervalSeconds' if defined, must be a number");
     }
 
+    let https: HttpsConfig | null = null;
+    if (doc.https != null) {
+        if (typeof doc.https !== "object") {
+            throw new Error("config.yaml: 'https' must be an object when defined");
+        }
+        if (typeof doc.https.keyPath !== "string" || typeof doc.https.certPath !== "string") {
+            throw new Error("config.yaml: 'https.keyPath' and 'https.certPath' must be strings");
+        }
+        https = {
+            keyPath: resolveConfigPath(configPath, doc.https.keyPath),
+            certPath: resolveConfigPath(configPath, doc.https.certPath),
+        };
+    }
+
     return {
         port: doc.port,
         starknetRpc: doc.starknetRpc ?? null,
@@ -163,6 +190,7 @@ export function loadConfig(): Config {
         rateLimit: doc.rateLimit,
         auth: doc.auth,
         cors,
+        https,
 
         swapsSyncIntervalSeconds: doc.swapsSyncIntervalSeconds ?? 300,
         reloadLpIntervalSeconds: doc.reloadLpIntervalSeconds ?? 300,

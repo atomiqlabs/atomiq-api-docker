@@ -5,3 +5,6 @@ dist-scripts/
 config.yaml
 *.sqlite3
 *.key
+
+server.cert
+server.key

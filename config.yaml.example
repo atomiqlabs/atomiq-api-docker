@@ -1,6 +1,9 @@
 # Server
 port: 3000
 logLevel: info   # error | warn | info | debug
+# https:         # omit or set to null to keep plain HTTP
+#   keyPath: "./tls/server.key"
+#   certPath: "./tls/server.crt"
 
 # Chains (set to null to disable a chain)
 starknetRpc: "https://starknet-sepolia.g.alchemy.com/..."

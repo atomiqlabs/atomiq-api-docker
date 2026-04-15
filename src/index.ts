@@ -11,6 +11,7 @@ import {loadConfig, logLevelToNumber} from "./config";
 import {createAuthMiddleware} from "./auth";
 import {createRateLimitMiddleware} from "./rateLimit";
 import {AlpenInitializer, BotanixInitializer, CitreaInitializer, GoatInitializer} from "@atomiqlabs/chain-evm";
+import {startServer} from "./server";
 
 
 const config = loadConfig();
@@ -148,9 +149,7 @@ async function main() {
     console.log(`Chains: ${swapper.getSmartChains().join(", ")}`);
     console.log(`Bitcoin network: ${config.bitcoinNetwork}`);
 
-    app.listen(config.port, () => {
-        console.log(`atomiq-api listening on port ${config.port}`);
-    });
+    startServer(app, config);
 }
 
 main().catch(err => {
