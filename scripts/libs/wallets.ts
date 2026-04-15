@@ -1,5 +1,5 @@
 import "dotenv/config";
-import fs from "fs";
+import * as fs from "fs";
 import {Keypair} from "@solana/web3.js";
 import {Account, CallData, DeployAccountContractPayload, ec, hash} from "starknet";
 import {BaseWallet, SigningKey, Wallet} from "ethers";

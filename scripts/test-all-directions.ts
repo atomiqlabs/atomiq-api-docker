@@ -1,20 +1,35 @@
-import {createSwap} from "./simple-create-swap";
-import {processSwap} from "./simple-process-swap";
+import {createSwap} from "./create-swap";
+import {processSwap} from "./process-swap";
 
-const DELAY_BETWEEN_SWAPS_MS = 60_000;
+const DELAY_BETWEEN_SWAPS_MS = 30_000;
 
 interface SwapDef {
     src: string;
     dst: string;
     amount: string;
     amountType: string;
+    srcAddress?: string;
+    dstAddress?: string;
 }
 
 const swaps: SwapDef[] = [
-    {src: "BITCOIN-BTC", dst: "STARKNET-STRK", amount: "3000", amountType: "EXACT_IN"},
-    {src: "STARKNET-STRK", dst: "BITCOIN-BTC", amount: "3000", amountType: "EXACT_OUT"},
-    {src: "BITCOIN-BTC", dst: "SOLANA-SOL", amount: "3000", amountType: "EXACT_IN"},
-    {src: "SOLANA-SOL", dst: "BITCOIN-BTC", amount: "3000", amountType: "EXACT_OUT"},
+    // // Starknet
+    // {src: "BITCOIN-BTC", dst: "STARKNET-STRK", amount: "3000", amountType: "EXACT_IN"},
+    // {src: "STARKNET-STRK", dst: "BITCOIN-BTC", amount: "3000", amountType: "EXACT_OUT"},
+    // {src: "LIGHTNING-BTC", dst: "STARKNET-STRK", amount: "3000", amountType: "EXACT_IN"},
+    // {src: "STARKNET-STRK", dst: "LIGHTNING-BTC", amount: "3000", amountType: "EXACT_OUT"},
+    //
+    // // Solana
+    // {src: "BITCOIN-BTC", dst: "SOLANA-SOL", amount: "3000", amountType: "EXACT_IN"},
+    // {src: "SOLANA-SOL", dst: "BITCOIN-BTC", amount: "3000", amountType: "EXACT_OUT"},
+    // {src: "LIGHTNING-BTC", dst: "SOLANA-SOL", amount: "3000", amountType: "EXACT_IN"},
+    // {src: "SOLANA-SOL", dst: "LIGHTNING-BTC", amount: "3000", amountType: "EXACT_OUT"},
+
+    // Citrea
+    {src: "BITCOIN-BTC", dst: "CITREA-CBTC", amount: "3000", amountType: "EXACT_IN"},
+    {src: "CITREA-CBTC", dst: "BITCOIN-BTC", amount: "3000", amountType: "EXACT_OUT"},
+    {src: "LIGHTNING-BTC", dst: "CITREA-CBTC", amount: "3000", amountType: "EXACT_IN"},
+    {src: "CITREA-CBTC", dst: "LIGHTNING-BTC", amount: "3000", amountType: "EXACT_OUT"},
 ];
 
 function label(i: number, swap: SwapDef): string {
@@ -31,7 +46,7 @@ async function runSwap(i: number, swap: SwapDef): Promise<{swap: SwapDef, status
     const tag = label(i, swap);
     try {
         console.log(`\n${tag} Creating swap: ${swap.src} -> ${swap.dst}, ${swap.amount} ${swap.amountType}`);
-        const {swapId, swapSecret} = await createSwap(swap.src, swap.dst, swap.amount, swap.amountType);
+        const {swapId, swapSecret} = await createSwap(swap.src, swap.dst, swap.amount, swap.amountType, swap.dstAddress, swap.srcAddress);
         console.log(`${tag} Swap created: ${swapId}`);
 
         console.log(`${tag} Processing swap...`);
@@ -45,7 +60,7 @@ async function runSwap(i: number, swap: SwapDef): Promise<{swap: SwapDef, status
     }
 }
 
-async function main() {
+async function main(srcLnurlWithdraw?: string, dstLnurlPay?: string) {
     console.log("=== Atomiq Test Harness ===");
     console.log(`Running ${swaps.length} swaps with ${DELAY_BETWEEN_SWAPS_MS / 1000}s delay between initiations\n`);
 
@@ -55,6 +70,21 @@ async function main() {
         if (i > 0) {
             console.log(`\n--- Waiting ${DELAY_BETWEEN_SWAPS_MS / 1000}s before next swap ---`);
             await sleep(DELAY_BETWEEN_SWAPS_MS);
+        }
+        const swapDef = swaps[i];
+        if(swapDef.src==="LIGHTNING-BTC") {
+            if(srcLnurlWithdraw==null) {
+                console.error("Cannot process lightning network source swap, pass the the lnurlWithdraw link!");
+                continue;
+            }
+            swapDef.srcAddress = srcLnurlWithdraw;
+        }
+        if(swapDef.dst==="LIGHTNING-BTC") {
+            if(dstLnurlPay==null) {
+                console.error("Cannot process lightning network destination swap, pass the the lnurlPay link!");
+                continue;
+            }
+            swapDef.dstAddress = dstLnurlPay;
         }
         promises.push(runSwap(i, swaps[i]));
     }
@@ -87,7 +117,9 @@ async function main() {
     }
 }
 
-main().catch(e => {
+const srcLnurlWithdraw = process.argv[2];
+const dstLnurlPay = process.argv[3];
+main(srcLnurlWithdraw, dstLnurlPay).catch(e => {
     console.error("Test harness fatal error:", e);
     process.exit(1);
 });

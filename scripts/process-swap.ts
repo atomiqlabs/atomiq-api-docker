@@ -145,11 +145,26 @@ export async function processSwap(swapId: string, swapSecret?: string): Promise<
                 }
                 case "SendToAddress": {
                     // Manual payment to address is required (i.e. for lightning network swaps)
-                    action.txs.forEach((tx: {address: string, name: string, amount: {amount: string, symbol: string}}) => {
-                        console.log("  Waiting for external payment...");
-                        console.log(`  Address: ${tx.address}`);
-                        console.log(`  Amount: ${tx.amount.amount} ${tx.amount.symbol}`);
-                    });
+                    if (status.lnurl?.withdraw!=null) {
+                        // Trigger LNURL-withdrawal through the /settleWithLnurl function
+                        console.log("  Using LNURL-withdraw link as an input for the swap...");
+                        console.log(`  LNURL link: ${status.lnurl.withdraw}`);
+                        const response = await fetch(API_URL+"/settleWithLnurl", {
+                            method: "POST",
+                            headers: {"Content-Type": "application/json"},
+                            body: JSON.stringify({swapId})
+                        });
+                        if(!response.ok) throw new Error(`Settle with LNURL error (${response.status}): `+await response.text());
+                        const result: any = await response.json();
+                        console.log(`  TX: ${result.paymentHash}`);
+                    } else {
+                        // Otherwise just display the payment address and wait for the payment to happen out of band
+                        action.txs.forEach((tx: {address: string, name: string, amount: {amount: string, symbol: string}}) => {
+                            console.log("  Waiting for external payment...");
+                            console.log(`  Address: ${tx.address}`);
+                            console.log(`  Amount: ${tx.amount.amount} ${tx.amount.symbol}`);
+                        });
+                    }
                     break;
                 }
                 case "Wait": {

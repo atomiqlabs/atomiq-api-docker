@@ -20,10 +20,14 @@ function getAddressForToken(tokenId: string) {
             return evmWallet.address;
     }
 }
-// NOTE: When using LNUR:-pay or LNURL-withdraw links prefer to handle the LNURL part on the client-side, this
+// NOTE: When using LNURL-pay or LNURL-withdraw links prefer to handle the LNURL part on the client-side, this
 //  minimizes the dependency and trust required on the side of the server
-export async function createSwap(srcToken: string, dstToken: string, amount: string, amountType: string, destinationAddress?: string): Promise<{swapId: string, swapSecret?: string}> {
-    const srcAddress = getAddressForToken(srcToken); // Get the internal wallet for the source chain
+export async function createSwap(
+    srcToken: string, dstToken: string,
+    amount: string, amountType: string,
+    destinationAddress?: string, sourceAddress?: string
+): Promise<{swapId: string, swapSecret?: string}> {
+    const srcAddress = sourceAddress ?? getAddressForToken(srcToken); // Get the internal wallet for the source chain
     const dstAddress = destinationAddress ?? getAddressForToken(dstToken); // Get the internal wallet for the destination chain
 
     if(dstAddress==null) throw new Error(`Cannot get internal wallet address for ${dstToken}! Provide it manually as a command line argument!`);
@@ -69,11 +73,16 @@ export async function createSwap(srcToken: string, dstToken: string, amount: str
 // Handle command line arguments
 // Always use chain prefix for a given token!
 if(require.main === module) {
-    const [srcToken, dstToken, amount, amountType, destinationAddress] = process.argv.slice(2);
+    let [srcToken, dstToken, amount, amountType, destinationAddress, sourceAddress] = process.argv.slice(2);
     if (!srcToken || !dstToken || !amount || !amountType) {
-        console.error("Usage: test-swap <srcToken> <dstToken> <amount> <amountType> [destinationAddress]");
-        console.error("Example: npx ts-node scripts/simple-create-swap.ts BITCOIN-BTC STARKNET-STRK 3000 EXACT_IN");
+        console.error("Usage: test-swap <srcToken> <dstToken> <amount> <amountType> [destinationAddress] [sourceAddress]");
+        console.error("Example: npx ts-node scripts/create-swap.ts BITCOIN-BTC STARKNET-STRK 3000 EXACT_IN");
     } else {
-        createSwap(srcToken, dstToken, amount, amountType, destinationAddress).catch(e => console.error(e));
+        createSwap(
+            srcToken, dstToken,
+            amount, amountType,
+            destinationAddress==="" || destinationAddress==="-" ? undefined : destinationAddress,
+            sourceAddress==="" || sourceAddress==="-" ? undefined : sourceAddress
+        ).catch(e => console.error(e));
     }
 }
