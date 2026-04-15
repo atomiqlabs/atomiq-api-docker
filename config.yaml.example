@@ -5,7 +5,7 @@ logLevel: info   # error | warn | info | debug
 # Chains (set to null to disable a chain)
 starknetRpc: "https://starknet-sepolia.g.alchemy.com/..."
 solanaRpc: "https://api.devnet.solana.com"
-bitcoinNetwork: TESTNET   # TESTNET | MAINNET
+bitcoinNetwork: TESTNET   # TESTNET | TESTNET4 | MAINNET
 
 # CORS (omit or set to null to disable)
 cors:

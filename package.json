@@ -9,7 +9,7 @@
     "build:scripts": "tsc -p tsconfig.scripts.json",
     "start": "node dist/index.js",
     "dev": "ts-node --project tsconfig.api.json src/index.ts",
-    "test:harness": "ts-node --project tsconfig.scripts.json scripts/test-harness.ts"
+    "test:harness": "ts-node --project tsconfig.scripts.json scripts/test-all-directions.ts"
   },
   "repository": {
     "type": "git",
@@ -19,6 +19,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@atomiqlabs/chain-evm": "github:atomiqlabs/atomiq-chain-evm#develop",
     "@atomiqlabs/chain-solana": "github:atomiqlabs/atomiq-chain-solana#develop",
     "@atomiqlabs/chain-starknet": "github:atomiqlabs/atomiq-chain-starknet#develop",
     "@atomiqlabs/sdk": "github:atomiqlabs/atomiq-sdk#api",

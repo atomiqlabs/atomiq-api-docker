@@ -1,8 +1,8 @@
 import "dotenv/config";
 import express from "express";
 import morgan from "morgan";
-import {SwapperFactory, BitcoinNetwork} from "@atomiqlabs/sdk";
-import {SqliteUnifiedStorage, SqliteStorageManager} from "@atomiqlabs/storage-sqlite";
+import {BitcoinNetwork, SwapperFactory} from "@atomiqlabs/sdk";
+import {SqliteStorageManager, SqliteUnifiedStorage} from "@atomiqlabs/storage-sqlite";
 import {StarknetInitializer} from "@atomiqlabs/chain-starknet";
 import {SwapperApi} from "@atomiqlabs/sdk/api";
 import {SolanaInitializer} from "@atomiqlabs/chain-solana";
@@ -10,15 +10,27 @@ import cors from "cors";
 import {loadConfig, logLevelToNumber} from "./config";
 import {createAuthMiddleware} from "./auth";
 import {createRateLimitMiddleware} from "./rateLimit";
+import {AlpenInitializer, BotanixInitializer, CitreaInitializer, GoatInitializer} from "@atomiqlabs/chain-evm";
 
 
 const config = loadConfig();
+const logLevelNumber = logLevelToNumber(config.logLevel);
+(global as any).atomiqLogLevel = logLevelNumber;
 
-(global as any).atomiqLogLevel = logLevelToNumber(config.logLevel);
+const bitcoinNetwork = config.bitcoinNetwork === "MAINNET"
+    ? BitcoinNetwork.MAINNET
+    : config.bitcoinNetwork === "TESTNET4"
+        ? BitcoinNetwork.TESTNET4
+        : BitcoinNetwork.TESTNET3;
 
-const bitcoinNetwork = config.bitcoinNetwork === "MAINNET" ? BitcoinNetwork.MAINNET : BitcoinNetwork.TESTNET;
-
-const chains = [StarknetInitializer, SolanaInitializer] as const;
+const chains = [
+    StarknetInitializer,
+    SolanaInitializer,
+    BotanixInitializer,
+    CitreaInitializer,
+    AlpenInitializer,
+    GoatInitializer
+] as const;
 
 const Factory = new SwapperFactory(chains);
 
@@ -29,6 +41,18 @@ const swapper = Factory.newSwapper({
         },
         SOLANA: config.solanaRpc == null ? null! : {
             rpcUrl: config.solanaRpc
+        },
+        BOTANIX: config.botanixRpc == null ? null! : {
+            rpcUrl: config.botanixRpc
+        },
+        CITREA: config.citreaRpc == null ? null! : {
+            rpcUrl: config.citreaRpc
+        },
+        ALPEN: config.alpenRpc == null ? null! : {
+            rpcUrl: config.alpenRpc
+        },
+        GOAT: config.goatRpc == null ? null! : {
+            rpcUrl: config.goatRpc
         }
     },
     bitcoinNetwork,
@@ -39,16 +63,24 @@ const swapper = Factory.newSwapper({
 const api = new SwapperApi(swapper);
 
 const app = express();
-app.use(morgan("combined"));
+if (logLevelNumber>=2) app.use(morgan("combined"));
+if (logLevelNumber>=3) app.use((req, res, next) => {
+    console.log({
+        time: new Date().toISOString(),
+        remoteAddress: req.socket.remoteAddress,
+        remoteFamily: req.socket.remoteFamily,
+        host: req.headers.host,
+        xff: req.headers['x-forwarded-for'],
+        ua: req.headers['user-agent'],
+        method: req.method,
+        url: req.originalUrl,
+    });
+    next();
+});
 app.use(express.json());
 if (config.cors) {
     app.use(cors(config.cors));
 }
-
-// Health check (before auth — always accessible)
-app.get("/health", (_req, res) => {
-    res.json({status: "ok"});
-});
 
 // Auth + Rate limiting
 app.use(createAuthMiddleware(config));
@@ -77,15 +109,43 @@ for (const [name, endpoint] of Object.entries(api.endpoints)) {
     console.log(`  ${endpoint.type} ${path}`);
 }
 
+function scheduleSyncTimer() {
+    let run: () => Promise<void>;
+    run = async () => {
+        try {
+            await api.sync();
+        } catch (e) {
+            console.error("Main: Swaps sync timer, error while syncing: ", e);
+        }
+        setTimeout(run, config.swapsSyncIntervalSeconds * 1000);
+    }
+    setTimeout(run, config.swapsSyncIntervalSeconds * 1000);
+}
+
+function scheduleLpReloadTimer() {
+    let run: () => Promise<void>;
+    run = async () => {
+        try {
+            await api.reloadLps();
+        } catch (e) {
+            console.error("Main: LP reload timer, error while reloading LPs: ", e);
+        }
+        setTimeout(run, config.reloadLpIntervalSeconds * 1000);
+    }
+    setTimeout(run, config.reloadLpIntervalSeconds * 1000);
+}
+
 async function main() {
     console.log("Initializing SwapperApi...");
     await api.init();
+    scheduleLpReloadTimer();
+    scheduleSyncTimer();
     console.log("SwapperApi initialized.");
 
     console.log(`Log level: ${config.logLevel} (${logLevelToNumber(config.logLevel)})`);
     console.log(`Auth paths: ${config.auth.length}`);
     console.log(`Global rate limit: ${config.rateLimit.maxRequests} req / ${config.rateLimit.windowMs}ms`);
-    console.log(`Chains: Starknet=${config.starknetRpc ? "enabled" : "disabled"}, Solana=${config.solanaRpc ? "enabled" : "disabled"}`);
+    console.log(`Chains: ${swapper.getSmartChains().join(", ")}`);
     console.log(`Bitcoin network: ${config.bitcoinNetwork}`);
 
     app.listen(config.port, () => {

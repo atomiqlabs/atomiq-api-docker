@@ -40,23 +40,32 @@ export interface CorsConfig {
 
 export type LogLevel = "error" | "warn" | "info" | "debug";
 
-const LOG_LEVEL_MAP: Record<LogLevel, number> = {
+const LOG_LEVEL_MAP: Record<LogLevel, 0 | 1 | 2 | 3> = {
     error: 0,
     warn: 1,
     info: 2,
     debug: 3,
 };
 
-export function logLevelToNumber(level: LogLevel): number {
+export function logLevelToNumber(level: LogLevel): 0 | 1 | 2 | 3 {
     return LOG_LEVEL_MAP[level];
 }
 
 export interface Config {
-    port: number;
+    logLevel: LogLevel;
+
     starknetRpc: string | null;
     solanaRpc: string | null;
-    bitcoinNetwork: "TESTNET" | "MAINNET";
-    logLevel: LogLevel;
+    botanixRpc: string | null;
+    citreaRpc: string | null;
+    alpenRpc: string | null;
+    goatRpc: string | null;
+    bitcoinNetwork: "TESTNET" | "TESTNET3" | "TESTNET4" | "MAINNET";
+
+    swapsSyncIntervalSeconds: number;
+    reloadLpIntervalSeconds: number;
+
+    port: number;
     rateLimit: RateLimitConfig;
     auth: AuthEntry[];
     cors: CorsConfig | null;
@@ -81,7 +90,7 @@ export function loadConfig(): Config {
         throw new Error("config.yaml: 'port' is required and must be a number");
     }
 
-    if (!doc.bitcoinNetwork || !["TESTNET", "MAINNET"].includes(doc.bitcoinNetwork)) {
+    if (!doc.bitcoinNetwork || !["TESTNET", "TESTNET3", "TESTNET4", "MAINNET"].includes(doc.bitcoinNetwork)) {
         throw new Error("config.yaml: 'bitcoinNetwork' must be TESTNET or MAINNET");
     }
 
@@ -134,14 +143,28 @@ export function loadConfig(): Config {
         cors = doc.cors;
     }
 
+    if (doc.swapsSyncIntervalSeconds!=null && typeof doc.swapsSyncIntervalSeconds !== "number") {
+        throw new Error("config.yaml: 'swapsSyncIntervalSeconds' if defined, must be a number");
+    }
+    if (doc.reloadLpIntervalSeconds!=null && typeof doc.reloadLpIntervalSeconds !== "number") {
+        throw new Error("config.yaml: 'reloadLpIntervalSeconds' if defined, must be a number");
+    }
+
     return {
         port: doc.port,
         starknetRpc: doc.starknetRpc ?? null,
         solanaRpc: doc.solanaRpc ?? null,
+        botanixRpc: doc.botanixRpc ?? null,
+        citreaRpc: doc.citreaRpc ?? null,
+        alpenRpc: doc.alpenRpc ?? null,
+        goatRpc: doc.goatRpc ?? null,
         bitcoinNetwork: doc.bitcoinNetwork,
         logLevel: doc.logLevel ?? "info",
         rateLimit: doc.rateLimit,
         auth: doc.auth,
         cors,
+
+        swapsSyncIntervalSeconds: doc.swapsSyncIntervalSeconds ?? 300,
+        reloadLpIntervalSeconds: doc.reloadLpIntervalSeconds ?? 300,
     };
 }
