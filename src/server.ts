@@ -46,13 +46,12 @@ function attachTlsReloadWatcher(server: https.Server, config: HttpsConfig) {
     });
 }
 
-export function startServer(app: Express, config: Config): http.Server | https.Server {
+export function startServer(app: Express, config: Config): void {
     if (config.https == null) {
-        const server = http.createServer(app);
-        server.listen(config.port, () => {
+        app.listen(config.port, () => {
             console.log(`atomiq-api listening on port ${config.port}`);
         });
-        return server;
+        return;
     }
 
     const server = https.createServer(loadTlsOptions(config.https), app);
@@ -60,5 +59,4 @@ export function startServer(app: Express, config: Config): http.Server | https.S
     server.listen(config.port, () => {
         console.log(`atomiq-api listening on HTTPS port ${config.port}`);
     });
-    return server;
 }
