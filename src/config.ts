@@ -71,6 +71,7 @@ export interface Config {
     reloadLpIntervalSeconds: number;
 
     port: number;
+    trustProxy: boolean;
     rateLimit: RateLimitConfig;
     auth: AuthEntry[];
     cors: CorsConfig | null;
@@ -114,6 +115,9 @@ export function loadConfig(): Config {
 
     if (!doc.rateLimit || typeof doc.rateLimit.windowMs !== "number" || typeof doc.rateLimit.maxRequests !== "number") {
         throw new Error("config.yaml: 'rateLimit' with windowMs and maxRequests is required");
+    }
+    if (doc.trustProxy != null && typeof doc.trustProxy !== "boolean") {
+        throw new Error("config.yaml: 'trustProxy' if defined, must be a boolean");
     }
 
     if (!Array.isArray(doc.auth) || doc.auth.length === 0) {
@@ -187,6 +191,7 @@ export function loadConfig(): Config {
         goatRpc: doc.goatRpc ?? null,
         bitcoinNetwork: doc.bitcoinNetwork,
         logLevel: doc.logLevel ?? "info",
+        trustProxy: doc.trustProxy ?? false,
         rateLimit: doc.rateLimit,
         auth: doc.auth,
         cors,

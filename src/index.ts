@@ -64,6 +64,7 @@ const swapper = Factory.newSwapper({
 const api = new SwapperApi(swapper);
 
 const app = express();
+app.set("trust proxy", config.trustProxy);
 if (logLevelNumber>=2) app.use(morgan("combined"));
 if (logLevelNumber>=3) app.use((req, res, next) => {
     console.log({
@@ -146,6 +147,7 @@ async function main() {
     console.log(`Log level: ${config.logLevel} (${logLevelToNumber(config.logLevel)})`);
     console.log(`Auth paths: ${config.auth.length}`);
     console.log(`Global rate limit: ${config.rateLimit.maxRequests} req / ${config.rateLimit.windowMs}ms`);
+    console.log(`Trust proxy: ${config.trustProxy}`);
     console.log(`Chains: ${swapper.getSmartChains().join(", ")}`);
     console.log(`Bitcoin network: ${config.bitcoinNetwork}`);
 

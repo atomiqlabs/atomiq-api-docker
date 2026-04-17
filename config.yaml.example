@@ -1,6 +1,7 @@
 # Server
 port: 3000
 logLevel: info   # error | warn | info | debug
+trustProxy: false   # set true only behind a trusted proxy/load balancer
 # https:         # omit or set to null to keep plain HTTP
 #   keyPath: "./tls/server.key"
 #   certPath: "./tls/server.crt"
