@@ -1,4 +1,4 @@
-FROM node:24.9.0-alpine3.21 as builder
+FROM node:24.9.0-alpine3.21 AS builder
 RUN apk --no-cache add curl git openssh python3
 RUN npm install -g typescript
 RUN curl -sf https://gobinaries.com/tj/node-prune | sh
