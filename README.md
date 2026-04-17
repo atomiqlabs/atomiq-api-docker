@@ -39,7 +39,7 @@ This document is written for integrators at wallet companies (e.g. Xverse, Leath
 - Exposes **10 HTTP endpoints** (quoting, creating, listing, polling, submitting swaps).
 - Holds the **local swap database** (SQLite files mounted into the container) and keeps them in sync in the background.
 - Provides **API-key** and **JWT** auth with per-path rate-limit overrides, so the same instance can serve both a trusted backend and untrusted public clients.
-- Supports **HTTPS with hot certificate reload**, so you can run it directly behind `certbot`.
+- Supports **HTTPS with hot certificate reload**, so you can run it directly with `certbot`-based TLS/SSL certificate provisioning
 
 ### What it deliberately is not
 
@@ -50,6 +50,8 @@ This document is written for integrators at wallet companies (e.g. Xverse, Leath
 ---
 
 ## System architecture
+
+//TODO: This only talks about a single possible constellation
 
 There are three parties in a typical integration:
 
@@ -114,6 +116,8 @@ If liquidity drops (LP goes offline, channel closes, etc.) the instance periodic
 
 ### Prerequisites
 
+//TODO: Add docker compose to prerequisites
+
 - Docker 24+.
 - RPC endpoints for the smart chains you want to enable. Mainnet Bitcoin is configured by network name only (no RPC).
 
@@ -158,6 +162,8 @@ auth:
 
 ### 3. Run
 
+//TODO: This should use docker-compose
+
 ```bash
 docker run --rm -p 3000:3000 \
   -v "$PWD/config.yaml:/src/config.yaml:ro" \
@@ -196,18 +202,19 @@ The service reads its entire runtime config from a single YAML file. Path resolu
 
 Top-level keys:
 
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `port` | number | **required** | TCP port the server binds to. |
-| `logLevel` | `error`\|`warn`\|`info`\|`debug` | `info` | `info` = morgan HTTP logs; `debug` = verbose per-request log line incl. IP, XFF, UA. |
-| `bitcoinNetwork` | `MAINNET`\|`TESTNET`\|`TESTNET3`\|`TESTNET4` | **required** | Which Bitcoin network the SDK connects to. `TESTNET` is an alias for `TESTNET3`. |
-| `starknetRpc` / `solanaRpc` / `botanixRpc` / `citreaRpc` / `alpenRpc` / `goatRpc` | string or null | null (disabled) | RPC URL per smart chain. Omit / set to null to disable that chain. |
-| `swapsSyncIntervalSeconds` | number | 300 | Interval between background `SwapperApi.sync()` calls (purges expired swaps, refreshes state). |
-| `reloadLpIntervalSeconds` | number | 300 | Interval between background LP reloads (re-discovers dropped LPs). |
-| `cors` | object or null | null (disabled) | Passed through to the [`cors`](https://github.com/expressjs/cors) middleware. |
-| `rateLimit` | `{ windowMs, maxRequests }` | **required** | Global fallback rate limit (applied when an auth path does not override). |
-| `auth` | array | **required**, non-empty | Ordered list of auth paths — see below. |
-| `https` | `{ keyPath, certPath }` or null | null (HTTP) | TLS config. Paths are resolved relative to the config file. |
+| Key                                                                               | Type                                          | Default                 | Description                                                                                        |
+|-----------------------------------------------------------------------------------|-----------------------------------------------|-------------------------|----------------------------------------------------------------------------------------------------|
+| `port`                                                                            | number                                        | **required**            | TCP port the server binds to.                                                                      |
+| `logLevel`                                                                        | `error`\|`warn`\|`info`\|`debug`              | `info`                  | `info` = morgan HTTP logs; `debug` = verbose per-request log line incl. IP, XFF, UA.               |
+| `bitcoinNetwork`                                                                  | `MAINNET`\|`TESTNET`\|`TESTNET3`\|`TESTNET4`  | **required**            | Which Bitcoin network the SDK connects to. `TESTNET` is an alias for `TESTNET3`.                   |
+| `starknetRpc` / `solanaRpc` / `botanixRpc` / `citreaRpc` / `alpenRpc` / `goatRpc` | string or null                                | null (disabled)         | RPC URL per smart chain. Omit / set to null to disable that chain.                                 |
+| `swapsSyncIntervalSeconds`                                                        | number                                        | 300                     | Interval between background `SwapperApi.sync()` calls (purges expired swaps, refreshes state).     |
+| `reloadLpIntervalSeconds`                                                         | number                                        | 300                     | Interval between background LP reloads (re-discovers dropped LPs).                                 |
+| `cors`                                                                            | object or null                                | null (disabled)         | Passed through to the [`cors`](https://github.com/expressjs/cors) middleware.                      |
+| `rateLimit`                                                                       | `{ windowMs, maxRequests }`                   | **required**            | Global fallback rate limit (applied when an auth path does not override).                          |
+| `auth`                                                                            | array                                         | **required**, non-empty | Ordered list of auth paths — see below.                                                            |
+| `https`                                                                           | `{ keyPath, certPath }` or null               | null (HTTP)             | TLS config. Paths are resolved relative to the config file.                                        |
+| `trustProxy`                                                                      | boolean                                      | `false`                       | When running the API behind a reverse proxy, set this to `true` to properly parse the user's IP addresses |
 
 ---
 
@@ -242,25 +249,9 @@ auth:
     name: "Public"
 ```
 
-Request matching order:
-
-```mermaid
-flowchart TD
-    REQ["Incoming request"] --> A1["auth[0]: apiKey match?<br/>(x-api-key header)"]
-    A1 -->|"yes"| OK1["Attach auth.name +<br/>rateLimitOverride, next()"]
-    A1 -->|"no"| A2["auth[1]: jwt match?<br/>(Authorization: Bearer ...)<br/>verify signature +<br/>required claims"]
-    A2 -->|"yes"| OK2["Attach auth.name +<br/>rateLimitOverride, next()"]
-    A2 -->|"no"| A3["auth[2]: type=none"]
-    A3 -->|"yes"| OK3["Attach auth.name +<br/>rateLimitOverride, next()"]
-    A3 -->|"no"| DENY["401 Unauthorized"]
-
-    OK1 --> RL["Rate limit middleware"]
-    OK2 --> RL
-    OK3 --> RL
-    RL --> APP["SwapperApi endpoint"]
-```
-
 ### API-key auth (backend-to-backend)
+
+//TODO: Very specific, this is just one possible configuration, it is also completely plausible that api-key based auth is used with the frontend
 
 Use this between your wallet backend and `atomiq-api-docker`.
 
@@ -272,6 +263,8 @@ x-api-key: replace-with-long-random-secret
 Treat the API key as a shared secret. The backend should never hand it to a client — clients authenticate with JWT (or nothing).
 
 ### JWT auth (client → API)
+
+//TODO: Very specific again, this should only concern the usage of JWTs with this API, no the overall client architecture
 
 This is the intended end-user flow:
 
@@ -304,7 +297,7 @@ sequenceDiagram
 - Exact match: `{ user_tier: "swapper" }` — the JWT payload must contain a matching scalar value.
 - Array-includes: `{ permissions: { includes: "swap_permission" } }` — the JWT payload must contain an array that includes the given value.
 
-### Generating a test key pair + JWT
+#### Generating a test key pair + JWT
 
 A helper script is bundled for local testing:
 
@@ -330,15 +323,11 @@ Pass an existing private key as the second argument to sign with your own key in
 
 ## Rate limiting
 
-Implemented in-memory per client IP, with a fixed window.
+Uses in-memory bucketing per client IP, with a fixed window.
 
 - Each auth entry can set its own `rateLimit: { windowMs, maxRequests }` or explicitly `null` (no limit — typical for `apiKey` backend traffic).
 - If an auth entry has **no** `rateLimit` key, the **global** `rateLimit` from the top level applies.
 - Exceeding the limit returns `429 { error: "Rate limit exceeded", retryAfter }`.
-
-The global rate limit is required even if all auth entries override it — it is the fallback for `type: none` paths that don't specify one.
-
-> The bucket store is a `Map<ip, { count, resetAt }>` in-process. If you run multiple replicas, rate limits are per-replica. Put a rate-limiting reverse proxy in front if you need cluster-wide limits.
 
 ---
 
@@ -355,6 +344,18 @@ https:
 Both paths are resolved relative to the `config.yaml` file.
 
 The server watches both files with a 1 s poll interval. On any change it schedules a **60 s-delayed reload** (debounced) via `server.setSecureContext(...)` — Node keeps serving existing connections during the swap. This is designed to work cleanly with Let's Encrypt / certbot renewal hooks: the renewal hook writes both files, the server picks them up within a minute without a restart.
+
+---
+
+## Running behind reverse proxy
+
+Set the `trustProxy` config option if you run the API behind a reverse proxy and want to correctly resolve client IP addresses (important for rate limitting)
+
+```yaml
+trustProxy: true
+```
+
+You can also let the reverse proxy handle the HTTPS connections and then don't have to setup the `https` for the API
 
 ---
 
@@ -377,7 +378,7 @@ All endpoints live at the root (`/`). Names and shapes come directly from the SD
 
 ### Token identifiers
 
-Tokens are identified by the strings the SDK accepts. Typical values:
+Tokens are identified by the string containing the network and the ticker, generally `<network>-<ticker>`. Typical values:
 
 - `BITCOIN-BTC` (on-chain Bitcoin)
 - `LIGHTNING-BTC` (Lightning BTC)
@@ -389,24 +390,24 @@ Use `GET /getSupportedTokens` to enumerate what the current LP set supports.
 
 ### `POST /createSwap`
 
-Opens a swap and returns a quote.
+Creates a swap and returns a quote.
 
 Request body:
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `srcToken` | string | ✓ | e.g. `BITCOIN-BTC`, `STARKNET-STRK`. |
-| `dstToken` | string | ✓ | |
-| `amount` | bigint (as string) | ✓ | Base units. |
-| `amountType` | `EXACT_IN` \| `EXACT_OUT` | ✓ | |
-| `srcAddress` | string | (✓ for smart → BTC/LN) | Also: LNURL-withdraw link when `srcToken = LIGHTNING-BTC`. |
+| Field | Type | Required | Notes                                                                                                           |
+|---|---|---|-----------------------------------------------------------------------------------------------------------------|
+| `srcToken` | string | ✓ | e.g. `BITCOIN-BTC`, `STARKNET-STRK`.                                                                            |
+| `dstToken` | string | ✓ |                                                                                                                 |
+| `amount` | bigint (as string) | ✓ | Base units.                                                                                                     |
+| `amountType` | `EXACT_IN` \| `EXACT_OUT` | ✓ |                                                                                                                 |
+| `srcAddress` | string | (✓ for smart → BTC/LN) | Also supports LNURL-withdraw link when `srcToken = LIGHTNING-BTC`.                                                    |
 | `dstAddress` | string | ✓ | Destination on the output chain. Also: LNURL-pay link, Lightning invoice, etc. when `dstToken = LIGHTNING-BTC`. |
-| `gasAmount` | bigint | optional | Gas token to drop on the destination chain. |
-| `paymentHash` | hex string | optional | Client-supplied payment hash for Lightning swaps (so the client can retain the preimage). |
-| `description` / `descriptionHash` | string / hex | optional | Lightning invoice metadata. |
-| `expirySeconds` | number | optional | Custom quote expiry. |
+| `gasAmount` | bigint | optional | Gas token to drop on the destination chain.                                                                     |
+| `paymentHash` | hex string | optional | Client-supplied payment hash for Lightning swaps (so the client can retain the preimage).                       |
+| `description` / `descriptionHash` | string / hex | optional | Lightning invoice metadata.                                                                                     |
+| `expirySeconds` | number | optional | Custom quote expiry.                                                                                            |
 
-Response body is a **swap record** (`SwapOutputBase`):
+Response body is a **swap record**:
 
 ```jsonc
 {
@@ -427,6 +428,8 @@ Response body is a **swap record** (`SwapOutputBase`):
 }
 ```
 
+//TODO: Add section about swap execution steps
+
 ### `GET /getSwapStatus`
 
 Polled continuously by the client. Returns the **current action** the wallet must perform.
@@ -446,11 +449,25 @@ Response extends the swap record with:
 
 ```jsonc
 {
+  "swapId": "…",
+  "swapType": "FROM_BTC_LN_AUTO",
+  "state": { "number": 1, "name": "CREATED", "description": "…" },
+  "quote": {
+    "inputAmount":  { "amount": "0.00003", "rawAmount": "3000", "decimals": 8, "symbol": "BTC", "chain": "BITCOIN" },
+    "outputAmount": { "amount": "4.21",    "rawAmount": "4210000000000000000", "decimals": 18, "symbol": "STRK", "chain": "STARKNET" },
+    "fees": {
+      "swap":          { "amount": "0.000001", "rawAmount": "100", "decimals": 8, "symbol": "BTC", "chain": "BITCOIN" },
+      "networkOutput": { "amount": "…", "rawAmount": "…", "decimals": 0, "symbol": "…", "chain": "…" }
+    },
+    "expiry": 1713360000000
+  },
+  "createdAt": 1713359700000,
+  "steps": [ /* SwapExecutionStep[] — hints for UX */ ]
   "isFinished": false,
   "isSuccess":  false,
   "isFailed":   false,
   "isExpired":  false,
-  "currentAction": { "type": "SignPSBT" },
+  "currentAction": { "type": "SendToAddress" },
   "requiresSecretReveal": false
 }
 ```
@@ -465,11 +482,11 @@ Submits client-signed transactions.
 { "swapId": "…", "signedTxs": ["<hex>", "<hex>"] }
 ```
 
-- **SignPSBT** → each `signedTxs[i]` is the **hex-encoded signed PSBT**.
+- **SignPSBT** → each `signedTxs[i]` is the **hex-encoded or base64-encoded signed PSBT**.
 - **SignSmartChainTransaction** → the format depends on the chain:
-  - **Solana**: hex-encoded serialized `Transaction` (use `partialSign`, the LP may already have co-signed).
+  - **Solana**: hex-encoded serialized Solana transaction (use `partialSign`, the LP may already have co-signed).
   - **Starknet**: JSON-stringified envelope (`{ type, signed, details, ... }`) as returned by the action, with a populated `signed` field.
-  - **EVM** (Botanix / Citrea / Alpen / Goat): hex-encoded `ethers` raw-transaction string.
+  - **EVM** (Botanix / Citrea / Alpen / Goat): hex-encoded Ethereum raw-transaction string.
 
 Response:
 
@@ -479,7 +496,7 @@ Response:
 
 See `scripts/process-swap.ts` for a full, per-chain signing reference implementation.
 
-### `GET /listSwaps` / `GET /listActionableSwaps`
+### `GET /listSwaps` / `GET /listPendingSwaps`
 
 ```
 ?signer=<address>&chainId=STARKNET
@@ -487,7 +504,7 @@ See `scripts/process-swap.ts` for a full, per-chain signing reference implementa
 
 - `signer` is a smart-chain address — required.
 - `chainId` is optional; when omitted, swaps from all chains are returned.
-- `listActionableSwaps` filters down to swaps with a pending action (the set you probably want for a "needs your attention" badge in the wallet UI).
+- `listPendingSwaps` filters down to swaps which are pending (the set you probably want for a "needs your attention" badge in the wallet UI).
 
 ### `GET /getSupportedTokens` / `GET /getSwapCounterTokens` / `GET /getSwapLimits`
 
@@ -511,6 +528,7 @@ Normalizes any address-like input the wallet paste field might receive: on-chain
 ?wallet=<address>&token=<tokenId>[&targetChain=STARKNET][&gasDrop=true][&feeRate=…][&minFeeRate=…][&feeMultiplier=…]
 ```
 
+//TODO: Update this once we have the swagger
 Net spendable balance of a wallet for a given token, accounting for chain fees. Bitcoin vs. smart-chain tokens accept different optional parameters — see the per-chain validation in `node_modules/@atomiqlabs/sdk/dist/api/SwapperApi.js`.
 
 Lightning balances are **not** supported by this endpoint (the SDK throws).
@@ -604,29 +622,33 @@ for (;;) {
 | `SendToAddress` | Pay an address out of band (usually BTC / Lightning). | `txs: [{ address, amount: ApiAmount, name }]` |
 | `Wait` | Do nothing, just poll. | `expectedTimeSeconds` |
 
-Pass the client's BTC `bitcoinAddress` + `bitcoinPublicKey` on every `/getSwapStatus` call — the API needs them to build funded PSBTs for SmartChain → BTC directions.
+Pass the client's BTC `bitcoinAddress` + `bitcoinPublicKey` on every `/getSwapStatus` call — the API needs them to build funded PSBTs for the Bitcoin → smart chain direction.
 
 ---
 
 ## Lightning and LNURL
 
-Two ways to handle Lightning:
+Two ways to handle Lightning LNURL links:
 
-### Recommended: client-side LNURL
+### a) Recommended: client-side LNURL
 
 Prefer resolving LNURLs on the client (wallet UI) and passing the resulting lightning invoice / payee info to `/createSwap`. This minimizes the trust the client places on the middleware: the API never sees a link that, if replaced, could redirect funds.
 
-### Supported: pass LNURLs directly
+### b) Supported: pass LNURLs directly
 
-You can pass an LNURL-withdraw link as `srcAddress` (for `LIGHTNING-BTC → *`) or an LNURL-pay link as `dstAddress` (for `* → LIGHTNING-BTC`) — the SDK resolves them internally.
+You can pass an LNURL-withdraw link as `srcAddress` (for `LIGHTNING-BTC → *`) or an LNURL-pay link as `dstAddress` (for `* → LIGHTNING-BTC`) — the SDK resolves them internally, which implies you trust the API server to resolve them properly.
+
+---
 
 ### Preimage reveal
 
-For `LIGHTNING-BTC → smart-chain` flows, the client usually generates a random 32-byte preimage and passes `paymentHash = sha256(preimage)` into `/createSwap`. When `/getSwapStatus` returns `requiresSecretReveal: true`, the client reveals the preimage by calling `/getSwapStatus?swapId=…&secret=<hex>`. The API stores it so the swap can complete.
+For `LIGHTNING-BTC → smart-chain` flows, the client usually generates a random 32-byte preimage and passes `paymentHash = sha256(preimage)` into `/createSwap`. When `/getSwapStatus` returns `requiresSecretReveal: true`, the client reveals the preimage by calling `/getSwapStatus?swapId=…&secret=<hex>`. The API then broadcasts this secret over Nostr to allow for automatic settlement or uses it to generate proper settlement transactions which are then returned to the user for signing.
 
 ---
 
 ## Persistence
+
+//TODO: Add a docker compose file with a proper storage for both, the sqlite DBs and also for the config
 
 The container writes SQLite files in the working directory (`/src`):
 
@@ -660,15 +682,13 @@ All endpoints return JSON. Errors come in two shapes:
 | 401 | `{ "error": "Unauthorized" }` | No auth entry matched. |
 | 429 | `{ "error": "Rate limit exceeded", "retryAfter": <seconds> }` | Per-IP, per-auth-path or global bucket exhausted. |
 
-Rate-limit state is per IP. Put a trusted reverse proxy in front and set `app.set('trust proxy', ...)` upstream if you need `X-Forwarded-For`-based limiting (today the service uses `req.ip` as-is).
+Rate-limit state is per IP. If you use a reverse proxy in front set the `trustProxy` config option to `true` in the config.
 
 ---
 
 ## Security notes
 
-- **Never expose the API-key path to end users.** The API key grants no-rate-limit access to every endpoint. Use JWT for clients.
-- **JWT clock skew and `exp`** — always sign JWTs with short lifetimes (`expiresIn` minutes, not days). `jsonwebtoken` enforces `exp`.
+[//]: # (- **Never expose the API-key path to end users.** The API key grants no-rate-limit access to every endpoint. Use JWT for clients.)
+- **JWT `exp` field** — the JWT authentication path enforces `exp`, so you can use it to tune expiration of the JWT.
 - **Public key rotation** — changing `auth[].publicKey` requires a restart. Plan a rollover window by temporarily listing both the old and new key as two JWT auth entries.
-- **TLS certificate commits** — `server.cert` in the repo is a placeholder sample. Generate your own key/cert (or use Let's Encrypt) for anything non-local; never commit private keys.
-- **CORS** — `origin: "*"` is fine for public LP-like endpoints but dangerous for backend-authenticated flows. Restrict to your wallet front-end origin(s) in production.
-- **Trust boundary** — the service trusts whatever `CONFIG_PATH` points to and whatever the SDK fetches from the LP network. Run it on infrastructure you control.
+- **CORS** — `origin: "*"` is fine for public endpoints but in production you should restrict it to your wallet front-end origin(s).
