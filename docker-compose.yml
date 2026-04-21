@@ -1,0 +1,17 @@
+services:
+  atomiq-api:
+    image: atomiqlabs/api
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./config.yaml:/src/config.yaml:ro
+      - atomiq-data:/src
+      # Uncomment if you terminate TLS in this container rather than a reverse proxy.
+      # - ./tls:/src/tls:ro
+    environment:
+      CONFIG_PATH: /src/config.yaml
+
+volumes:
+  atomiq-data:

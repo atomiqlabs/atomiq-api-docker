@@ -51,9 +51,9 @@ This document is written for integrators at wallet companies (e.g. Xverse, Leath
 
 ## System architecture
 
-//TODO: This only talks about a single possible constellation
+The diagram below shows one representative deployment in which a wallet backend fronts the API for its own end users. `atomiq-api-docker` does not require this exact topology — it can just as well be consumed directly by a frontend, by a standalone script, or by any other service that can speak HTTP and sign transactions client-side. Treat the three-party split as one illustrative example rather than a prescribed layout.
 
-There are three parties in a typical integration:
+There are three parties in this typical integration:
 
 ```mermaid
 flowchart LR
@@ -116,9 +116,7 @@ If liquidity drops (LP goes offline, channel closes, etc.) the instance periodic
 
 ### Prerequisites
 
-//TODO: Add docker compose to prerequisites
-
-- Docker 24+.
+- Docker 24+ with the Docker Compose plugin (`docker compose` v2).
 - RPC endpoints for the smart chains you want to enable. Mainnet Bitcoin is configured by network name only (no RPC).
 
 ### 1. Build the image
@@ -162,16 +160,13 @@ auth:
 
 ### 3. Run
 
-//TODO: This should use docker-compose
+Use the bundled `docker-compose.yml`:
 
 ```bash
-docker run --rm -p 3000:3000 \
-  -v "$PWD/config.yaml:/src/config.yaml:ro" \
-  -v "$PWD/atomiq-data:/src" \
-  atomiqlabs/api
+docker compose up -d
 ```
 
-The second volume persists the SQLite swap databases across restarts — see [Persistence](#persistence).
+This starts the service on port `3000`, mounts `./config.yaml` read-only, and persists the SQLite swap databases in a named `atomiq-data` volume so they survive container restarts — see [Persistence](#persistence).
 
 On startup you should see:
 
@@ -249,29 +244,26 @@ auth:
     name: "Public"
 ```
 
-### API-key auth (backend-to-backend)
+### API-key auth
 
-//TODO: Very specific, this is just one possible configuration, it is also completely plausible that api-key based auth is used with the frontend
-
-Use this between your wallet backend and `atomiq-api-docker`.
+Any client that can present the configured shared secret in a header (default `x-api-key`) is authorized on this path.
 
 ```http
 GET /listSwaps?signer=0x... HTTP/1.1
 x-api-key: replace-with-long-random-secret
 ```
 
-Treat the API key as a shared secret. The backend should never hand it to a client — clients authenticate with JWT (or nothing).
+Treat the API key as a shared secret. Whether you ship it to a trusted backend, embed it in a first-party frontend, or hand it to an operator depends on your threat model — just never expose it to clients you do not control.
 
-### JWT auth (client → API)
+### JWT auth
 
-//TODO: Very specific again, this should only concern the usage of JWTs with this API, no the overall client architecture
+Requests are authorized by a signed JWT in the `Authorization: Bearer <jwt>` header. The service:
 
-This is the intended end-user flow:
+1. Verifies the JWT signature against the public key configured in `config.yaml` using the algorithms listed in `algorithms`.
+2. Enforces the standard `exp` claim.
+3. Checks any additional required claims listed under `claims` on the auth entry.
 
-1. The user authenticates against **your wallet backend**.
-2. The backend signs a JWT with its private key (RS256 / ES256 / etc.) and returns it to the client.
-3. The client sends `Authorization: Bearer <jwt>` to `atomiq-api-docker`.
-4. `atomiq-api-docker` verifies the signature against the **public key configured in `config.yaml`** and checks any required `claims`.
+How the JWT is minted and delivered to the caller is out of scope for this service — issue it from any auth system that can sign with a key pair whose public half you paste into `config.yaml`.
 
 ```mermaid
 sequenceDiagram
@@ -424,11 +416,22 @@ Response body is a **swap record**:
     "expiry": 1713360000000
   },
   "createdAt": 1713359700000,
-  "steps": [ /* SwapExecutionStep[] — hints for UX */ ]
+  "steps": [ /* SwapExecutionStep[] — hints for UX, see below */ ]
 }
 ```
 
-//TODO: Add section about swap execution steps
+#### Swap execution steps
+
+`steps` is a UX hint that describes the swap as a linear sequence of stages the user progresses through. Each step declares which side of the swap it belongs to (`source` / `destination`), the relevant `chain`, a human-readable `title` / `description`, and a `status` that advances as the swap moves forward. Steps are best used to render a progress strip in the wallet UI; the actionable state lives in `currentAction` returned by `getSwapStatus`.
+
+| `type` | Meaning | Statuses |
+|---|---|---|
+| `Setup` | Destination-side setup required before the swap can continue (e.g. creating the destination HTLC / escrow). | `awaiting`, `completed`, `soft_expired`, `expired` |
+| `Payment` | The user's payment that initiates or funds the swap on the source side. | `inactive`, `awaiting`, `received`, `confirmed`, `soft_expired`, `expired` |
+| `Settlement` | Payout / settlement on the destination side. | `inactive`, `waiting_lp`, `awaiting_automatic`, `awaiting_manual`, `soft_settled`, `soft_expired`, `settled`, `expired` |
+| `Refund` | Source-side refund path after a failed swap. | `inactive`, `awaiting`, `refunded` |
+
+Bitcoin `Payment` steps additionally include a `confirmations: { current, target, etaSeconds }` progress object once the funding transaction has been seen on-chain. All step objects carry `initTxId`, `settleTxId`, `setupTxId`, or `refundTxId` fields as the relevant transactions are broadcast — these are convenient to link into a block explorer.
 
 ### `GET /getSwapStatus`
 
@@ -525,11 +528,10 @@ Normalizes any address-like input the wallet paste field might receive: on-chain
 ### `GET /getSpendableBalance`
 
 ```
-?wallet=<address>&token=<tokenId>[&targetChain=STARKNET][&gasDrop=true][&feeRate=…][&minFeeRate=…][&feeMultiplier=…]
+?wallet=<address>&token=<tokenId>[&targetChain=STARKNET][&gasDrop=true][&feeRate=…][&minBitcoinFeeRate=…][&feeMultiplier=…]
 ```
 
-//TODO: Update this once we have the swagger
-Net spendable balance of a wallet for a given token, accounting for chain fees. Bitcoin vs. smart-chain tokens accept different optional parameters — see the per-chain validation in `node_modules/@atomiqlabs/sdk/dist/api/SwapperApi.js`.
+Net spendable balance of a wallet for a given token, accounting for chain fees. Bitcoin and smart-chain tokens accept different optional parameters — see the [`getSpendableBalance`](../../atomiq-sdk/openapi.json) entry in the OpenAPI spec for the authoritative list of query parameters and the chain-specific `feeRate` format.
 
 Lightning balances are **not** supported by this endpoint (the SDK throws).
 
@@ -648,14 +650,12 @@ For `LIGHTNING-BTC → smart-chain` flows, the client usually generates a random
 
 ## Persistence
 
-//TODO: Add a docker compose file with a proper storage for both, the sqlite DBs and also for the config
-
 The container writes SQLite files in the working directory (`/src`):
 
 - `CHAIN_atomiqsdk-1-<CHAINID>.sqlite3` — one per active smart chain; swap state for that chain.
 - `STORE_<name>.sqlite3` — additional SDK state (e.g. `solAccounts`).
 
-Mount `/src` (or just those files) to a host volume if you want swap state to survive container restarts. Without a volume the instance cannot resume in-flight swaps after an upgrade.
+The bundled `docker-compose.yml` mounts `./config.yaml` read-only into the container and persists `/src` as a named `atomiq-data` volume so swap state survives restarts and upgrades. If you run the container directly with `docker run`, pass `-v "$PWD/atomiq-data:/src"` (or a similar bind mount) — without a volume the instance cannot resume in-flight swaps after an upgrade.
 
 ---
 
