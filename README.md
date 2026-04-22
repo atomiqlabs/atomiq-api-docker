@@ -122,7 +122,7 @@ If liquidity drops (LP goes offline, channel closes, etc.) the instance periodic
 ### 1. Build the image
 
 ```bash
-./build.sh
+sh build.sh
 # equivalent to: docker build -t atomiqlabs/api .
 ```
 
@@ -142,7 +142,7 @@ Minimum viable config (testnet, public access, no TLS):
 port: 3000
 logLevel: info
 
-starknetRpc: "https://starknet-sepolia.g.alchemy.com/..."
+starknetRpc: "https://rpc.starknet.lava.build/"
 solanaRpc:   "https://api.devnet.solana.com"
 bitcoinNetwork: TESTNET
 
@@ -151,7 +151,7 @@ cors:
 
 rateLimit:
   windowMs: 60000
-  maxRequests: 10
+  maxRequests: 200
 
 auth:
   - type: none
@@ -164,9 +164,17 @@ Use the bundled `docker-compose.yml`:
 
 ```bash
 docker compose up -d
+# if this doesn't work, try: docker-compose up -d
 ```
 
 This starts the service on port `3000`, mounts `./config` read-only, and persists the SQLite swap databases in the host `./storage` directory so they survive container restarts — see [Persistence](#persistence). The bundled compose file also sets `CONFIG_PATH=/src/config/config.yaml` and `STORAGE_DIR=/src/storage`.
+
+You can check the API server's logs with:
+
+```bash
+docker compose logs -f
+# if this doesn't work, try: docker-compose logs -f
+```
 
 On startup you should see:
 
@@ -190,12 +198,7 @@ curl "http://localhost:3000/getSupportedTokens?side=INPUT"
 
 ## Configuration (`config.yaml`)
 
-The service reads its entire runtime config from a single YAML file. Path resolution:
-
-1. `CONFIG_PATH` environment variable (used by Docker Compose to inject from `.env`).
-2. `./config.yaml` in the working directory.
-
-SQLite storage location is configured separately via the `STORAGE_DIR` environment variable. If unset, the process working directory is used.
+The service reads its entire runtime config from a single YAML file. It is configured using the `CONFIG_PATH` environment variable, by default the file is located in `config/config.yaml`:
 
 Top-level keys:
 
@@ -652,7 +655,7 @@ For `LIGHTNING-BTC → smart-chain` flows, the client usually generates a random
 
 ## Persistence
 
-The container writes SQLite files into the directory pointed to by `STORAGE_DIR`. In the bundled compose setup that is `/src/storage`, backed by the host `./storage` directory:
+The container writes SQLite files into the directory pointed to by `STORAGE_DIR`. By default this uses the `./storage` directory.
 
 - `CHAIN_atomiqsdk-1-<CHAINID>.sqlite3` — one per active smart chain; swap state for that chain.
 - `STORE_<name>.sqlite3` — additional SDK state (e.g. `solAccounts`).

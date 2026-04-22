@@ -1,7 +1,6 @@
 node_modules/
 dist/
 dist-scripts/
-.env
 config.yaml
 config/*
 !config/config.yaml.example
