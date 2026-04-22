@@ -7,7 +7,7 @@ trustProxy: false   # set true only behind a trusted proxy/load balancer
 #   certPath: "./tls/server.cert" # paths are relative to the config.yaml's directory
 
 # Chains (set to null to disable a chain)
-starknetRpc: "https://starknet-sepolia.g.alchemy.com/..."
+starknetRpc: "https://rpc.starknet.lava.build/"
 solanaRpc: "https://api.devnet.solana.com"
 bitcoinNetwork: TESTNET   # TESTNET | TESTNET4 | MAINNET
 
@@ -20,7 +20,7 @@ cors:
 # Global rate limit (applies when no auth-based override matches)
 rateLimit:
   windowMs: 60000
-  maxRequests: 10
+  maxRequests: 200
 
 # Auth paths — ordered array, first match wins
 auth:
@@ -32,15 +32,15 @@ auth:
     rateLimit: null                 # null = no rate limit
 
   # JWT auth with elevated rate limit
-  - type: jwt
-    name: "Premium Users"
-    publicKey: "-----BEGIN PUBLIC KEY-----\nYOUR_PUBLIC_KEY_HERE\n-----END PUBLIC KEY-----"
-    algorithms: [RS256]
-    claims:                         # optional JWT claim matching
-      user_tier: "swapper"
-    rateLimit:
-      windowMs: 60000
-      maxRequests: 200
+  # - type: jwt
+  #   name: "Premium Users"
+  #   publicKey: "-----BEGIN PUBLIC KEY-----\nYOUR_PUBLIC_KEY_HERE\n-----END PUBLIC KEY-----"
+  #   algorithms: [RS256]
+  #   claims:                         # optional JWT claim matching
+  #     user_tier: "swapper"
+  #   rateLimit:
+  #     windowMs: 60000
+  #     maxRequests: 200
 
   # JWT auth with array-includes claim matching
   # - type: jwt
