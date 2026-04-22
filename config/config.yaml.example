@@ -3,8 +3,8 @@ port: 3000
 logLevel: info   # error | warn | info | debug
 trustProxy: false   # set true only behind a trusted proxy/load balancer
 # https:         # omit or set to null to keep plain HTTP
-#   keyPath: "./tls/server.key"
-#   certPath: "./tls/server.crt"
+#   keyPath: "./tls/server.key" # paths are relative to the config.yaml's directory
+#   certPath: "./tls/server.cert" # paths are relative to the config.yaml's directory
 
 # Chains (set to null to disable a chain)
 starknetRpc: "https://starknet-sepolia.g.alchemy.com/..."

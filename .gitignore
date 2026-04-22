@@ -3,8 +3,11 @@ dist/
 dist-scripts/
 .env
 config.yaml
+config/*
+!config/config.yaml.example
+!config/tls
+config/tls/*
+!config/tls/.gitkeep
+storage/*
 *.sqlite3
 *.key
-
-server.cert
-server.key

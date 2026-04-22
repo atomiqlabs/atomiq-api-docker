@@ -128,12 +128,12 @@ If liquidity drops (LP goes offline, channel closes, etc.) the instance periodic
 
 The final image is Alpine-based, ~280 MB.
 
-### 2. Create a `config.yaml`
+### 2. Create `config/config.yaml`
 
-Start from `config.yaml.example`:
+Start from `config/config.yaml.example`:
 
 ```bash
-cp config.yaml.example config.yaml
+cp config/config.yaml.example config/config.yaml
 ```
 
 Minimum viable config (testnet, public access, no TLS):
@@ -166,7 +166,7 @@ Use the bundled `docker-compose.yml`:
 docker compose up -d
 ```
 
-This starts the service on port `3000`, mounts `./config.yaml` read-only, and persists the SQLite swap databases in a named `atomiq-data` volume so they survive container restarts — see [Persistence](#persistence).
+This starts the service on port `3000`, mounts `./config` read-only, and persists the SQLite swap databases in the host `./storage` directory so they survive container restarts — see [Persistence](#persistence). The bundled compose file also sets `CONFIG_PATH=/src/config/config.yaml` and `STORAGE_DIR=/src/storage`.
 
 On startup you should see:
 
@@ -194,6 +194,8 @@ The service reads its entire runtime config from a single YAML file. Path resolu
 
 1. `CONFIG_PATH` environment variable (used by Docker Compose to inject from `.env`).
 2. `./config.yaml` in the working directory.
+
+SQLite storage location is configured separately via the `STORAGE_DIR` environment variable. If unset, the process working directory is used.
 
 Top-level keys:
 
@@ -330,10 +332,10 @@ Set `https` in the config to run TLS directly:
 ```yaml
 https:
   keyPath: "./tls/server.key"
-  certPath: "./tls/server.crt"
+  certPath: "./tls/server.cert"
 ```
 
-Both paths are resolved relative to the `config.yaml` file.
+Both paths are resolved relative to the `config.yaml` file. With the bundled compose layout that means you can keep the certificate, key, or symlinks to them under `config/tls/` and mount the whole config directory into the container read-only.
 
 The server watches both files with a 1 s poll interval. On any change it schedules a **60 s-delayed reload** (debounced) via `server.setSecureContext(...)` — Node keeps serving existing connections during the swap. This is designed to work cleanly with Let's Encrypt / certbot renewal hooks: the renewal hook writes both files, the server picks them up within a minute without a restart.
 
@@ -650,12 +652,12 @@ For `LIGHTNING-BTC → smart-chain` flows, the client usually generates a random
 
 ## Persistence
 
-The container writes SQLite files in the working directory (`/src`):
+The container writes SQLite files into the directory pointed to by `STORAGE_DIR`. In the bundled compose setup that is `/src/storage`, backed by the host `./storage` directory:
 
 - `CHAIN_atomiqsdk-1-<CHAINID>.sqlite3` — one per active smart chain; swap state for that chain.
 - `STORE_<name>.sqlite3` — additional SDK state (e.g. `solAccounts`).
 
-The bundled `docker-compose.yml` mounts `./config.yaml` read-only into the container and persists `/src` as a named `atomiq-data` volume so swap state survives restarts and upgrades. If you run the container directly with `docker run`, pass `-v "$PWD/atomiq-data:/src"` (or a similar bind mount) — without a volume the instance cannot resume in-flight swaps after an upgrade.
+The bundled `docker-compose.yml` mounts `./config` read-only into `/src/config`, mounts `./storage` into `/src/storage`, and sets `CONFIG_PATH=/src/config/config.yaml` plus `STORAGE_DIR=/src/storage`. If you run the container directly with `docker run`, mirror those mounts and environment variables — without the storage bind mount the instance cannot resume in-flight swaps after an upgrade.
 
 ---
 

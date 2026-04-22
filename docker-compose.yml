@@ -6,12 +6,9 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./config.yaml:/src/config.yaml:ro
-      - atomiq-data:/src
-      # Uncomment if you terminate TLS in this container rather than a reverse proxy.
-      # - ./tls:/src/tls:ro
+      - ./config:/src/config:ro
+      - ./storage:/src/storage
+      # Place TLS files or symlinks under ./config/tls and reference them from config/config.yaml.
     environment:
-      CONFIG_PATH: /src/config.yaml
-
-volumes:
-  atomiq-data:
+      CONFIG_PATH: /src/config/config.yaml
+      STORAGE_DIR: /src/storage

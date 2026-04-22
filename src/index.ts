@@ -1,4 +1,6 @@
 import "dotenv/config";
+import { mkdirSync } from "fs";
+import * as path from "path";
 import express from "express";
 import morgan from "morgan";
 import {BitcoinNetwork, SwapperFactory} from "@atomiqlabs/sdk";
@@ -34,6 +36,9 @@ const chains = [
 ] as const;
 
 const Factory = new SwapperFactory(chains);
+const storageDir = path.resolve(process.cwd(), process.env.STORAGE_DIR ?? ".");
+mkdirSync(storageDir, {recursive: true});
+const resolveStoragePath = (fileName: string) => path.join(storageDir, fileName);
 
 const swapper = Factory.newSwapper({
     chains: {
@@ -57,8 +62,8 @@ const swapper = Factory.newSwapper({
         }
     },
     bitcoinNetwork,
-    swapStorage: chainId => new SqliteUnifiedStorage("CHAIN_" + chainId + ".sqlite3"),
-    chainStorageCtor: name => new SqliteStorageManager("STORE_" + name + ".sqlite3"),
+    swapStorage: chainId => new SqliteUnifiedStorage(resolveStoragePath("CHAIN_" + chainId + ".sqlite3")),
+    chainStorageCtor: name => new SqliteStorageManager(resolveStoragePath("STORE_" + name + ".sqlite3")),
 });
 
 const api = new SwapperApi(swapper);
@@ -148,6 +153,7 @@ async function main() {
     console.log(`Auth paths: ${config.auth.length}`);
     console.log(`Global rate limit: ${config.rateLimit.maxRequests} req / ${config.rateLimit.windowMs}ms`);
     console.log(`Trust proxy: ${config.trustProxy}`);
+    console.log(`Storage directory: ${storageDir}`);
     console.log(`Chains: ${swapper.getSmartChains().join(", ")}`);
     console.log(`Bitcoin network: ${config.bitcoinNetwork}`);
 
