@@ -19,9 +19,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@atomiqlabs/chain-evm": "^2.3.0",
-    "@atomiqlabs/chain-solana": "^13.3.0",
-    "@atomiqlabs/chain-starknet": "^8.3.0",
+    "@atomiqlabs/chain-evm": "^2.4.0",
+    "@atomiqlabs/chain-solana": "^13.4.1",
+    "@atomiqlabs/chain-starknet": "^8.4.0",
     "@atomiqlabs/sdk": "github:atomiqlabs/atomiq-sdk#api",
     "@atomiqlabs/storage-sqlite": "^5.0.2",
     "@scure/btc-signer": "1.7",
