@@ -2,9 +2,9 @@
 
 A dockerized HTTP API for the [Atomiq](https://atomiq.exchange) cross-chain DEX.
 
-Wraps the [`@atomiqlabs/sdk`](https://github.com/atomiqlabs/atomiq-sdk) `SwapperApi` in an [Express](https://expressjs.com/) server so a **wallet backend** can embed trustless swaps between **Bitcoin / Lightning** and smart chains (**Starknet, Solana, Botanix, Citrea, Alpen, Goat**) without pulling the full SDK into every mobile/extension/web client.
+It lets you offer trustless swaps between **Bitcoin / Lightning** and smart chains (**Starknet, Solana, Botanix, Citrea, Alpen, Goat**) without bundling the full Atomiq SDK into every mobile, extension, or web client.
 
-This document is written for integrators at wallet companies (e.g. Xverse, Leather, Phantom-style wallets) who want to run `atomiq-api-docker` as part of their own infrastructure and expose swaps to their end users.
+This document is written for integrators at wallet companies (think Xverse, Leather, or Phantom-style wallets), but it's just as useful if you simply want to run `atomiq-api-docker` as part of your own infrastructure and expose swaps to your users.
 
 > The repo also contains helper scripts in `scripts/` (`create-swap.ts`, `process-swap.ts`, `generate-jwt.ts`, `test-all-directions.ts`). Those are a reference client / test harness, not part of the API surface. This README focuses on the **API** you deploy.
 
