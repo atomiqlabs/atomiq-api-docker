@@ -55,38 +55,7 @@ The diagram below shows one representative deployment in which a wallet backend 
 
 There are three parties in this typical integration:
 
-```mermaid
-flowchart LR
-    subgraph CLIENT["Client Wallet<br/>(mobile, extension, web)"]
-        UI["Wallet UI"]
-        KEYS["Private keys<br/>(BTC, Starknet, Solana, EVM)"]
-    end
-
-    subgraph BACKEND["Wallet Backend<br/>(your infrastructure)"]
-        AUTH["Auth service<br/>(issues JWTs)"]
-        API["atomiq-api-docker<br/>(this project)"]
-        DB[("SQLite<br/>swap state")]
-        API --- DB
-    end
-
-    subgraph NETWORK["Atomiq Network + Chains"]
-        LPS["LP nodes<br/>(RFQ quotes)"]
-        BTC["Bitcoin / Lightning"]
-        SC["Starknet / Solana /<br/>Botanix / Citrea / Alpen / Goat"]
-    end
-
-    UI -->|"1. login"| AUTH
-    AUTH -->|"2. signed JWT"| UI
-    UI -->|"3. Authorization: Bearer JWT<br/>(swap requests)"| API
-    AUTH -.->|"x-api-key<br/>(privileged calls)"| API
-
-    API -->|"RFQ quotes,<br/>HTLC / SPV-vault setup"| LPS
-    API -->|"read-only RPC"| SC
-    API -->|"fee rates, PSBT building"| BTC
-
-    UI -->|"sign PSBT /<br/>sign smart-chain tx"| KEYS
-    UI -->|"4. submitTransaction<br/>(signed hex)"| API
-```
+![System architecture](docs/system-architecture.svg)
 
 **Why three parties?**
 
