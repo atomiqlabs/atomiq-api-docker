@@ -35,7 +35,6 @@ This document is written for integrators at wallet companies (think Xverse, Leat
 
 `atomiq-api-docker` is a thin, stateful HTTP layer over the Atomiq SDK:
 
-- Embeds one **`SwapperApi`** instance wired to all supported smart chains.
 - Exposes **10 HTTP endpoints** (quoting, creating, listing, polling, submitting swaps).
 - Holds the **local swap database** (SQLite files mounted into the container) and keeps them in sync in the background.
 - Provides **API-key** and **JWT** auth with per-path rate-limit overrides, so the same instance can serve both a trusted backend and untrusted public clients.
@@ -44,40 +43,18 @@ This document is written for integrators at wallet companies (think Xverse, Leat
 ### What it deliberately is not
 
 - **Not a custodian.** Atomiq swaps are trustless HTLC / PSBT / SPV-vault flows — the API never holds user keys. All signing happens in the **client wallet**; the API only generates unsigned transactions and submits signed ones.
-- **Not a liquidity provider.** Quotes come from the Atomiq LP network (see [Where Atomiq liquidity comes from](#where-atomiq-liquidity-comes-from)).
 - **Not a UI.** It is a backend service. You build the wallet UX around it.
 
 ---
 
 ## System architecture
 
-The diagram below shows one representative deployment in which a wallet backend fronts the API for its own end users. `atomiq-api-docker` does not require this exact topology — it can just as well be consumed directly by a frontend, by a standalone script, or by any other service that can speak HTTP and sign transactions client-side. Treat the three-party split as one illustrative example rather than a prescribed layout.
-
-There are three parties in this typical integration:
+At a glance, the API sits between a wallet client and the Atomiq liquidity network plus the underlying chains. It coordinates quotes from LPs, reads from and submits transactions to Bitcoin and the smart chains, and persists swap state locally. The wallet client meanwhile keeps custody of keys and signs whatever the swap flow requires, as the API itself never holds funds or signing material.
 
 ![System architecture](docs/docker-swap-backend.svg)
 
-**Why three parties?**
 
-| Party | Role | Talks to |
-|---|---|---|
-| **Client wallet** | Holds keys. Signs PSBTs and smart-chain transactions. | Your wallet backend, `atomiq-api-docker` |
-| **Wallet backend** | Issues JWTs to authenticated end users. Optionally calls `atomiq-api-docker` with an API key for privileged admin flows. Hosts `atomiq-api-docker`. | Clients, `atomiq-api-docker` |
-| **`atomiq-api-docker`** | Single stateful process that talks to Atomiq LPs and all chain RPCs, persists swap state, returns actions the client must sign. | LPs, chain RPCs, clients, backend |
-
-Typical deployment: the wallet backend runs the container on an internal network, terminates TLS on it directly (or behind a reverse proxy), and end-user clients hit it with a short-lived JWT issued by the backend's auth service.
-
----
-
-## Where Atomiq liquidity comes from
-
-`atomiq-api-docker` is a client of the Atomiq LP network. It does **not** run an LP itself. When you call `createSwap`, the SDK:
-
-1. Looks up registered LP nodes for the requested token pair.
-2. Requests a quote (RFQ) from one or more of them.
-3. Returns the best quote with fees and expiry.
-
-If liquidity drops (LP goes offline, channel closes, etc.) the instance periodically reloads the LP list in the background — see [Background maintenance timers](#background-maintenance-timers).
+Typical deployment: the wallet backend runs the container on an internal network, and terminates TLS on it directly (or behind a reverse proxy).
 
 ---
 
@@ -86,7 +63,6 @@ If liquidity drops (LP goes offline, channel closes, etc.) the instance periodic
 ### Prerequisites
 
 - Docker 24+ with the Docker Compose plugin (`docker compose` v2).
-- RPC endpoints for the smart chains you want to enable. Mainnet Bitcoin is configured by network name only (no RPC).
 
 ### 1. Build the image
 
@@ -113,6 +89,10 @@ logLevel: info
 
 starknetRpc: "https://rpc.starknet.lava.build/"
 solanaRpc:   "https://api.devnet.solana.com"
+botanixRpc: null
+citreaRpc: null
+alpenRpc: null
+goatRpc: null
 bitcoinNetwork: TESTNET
 
 cors:
@@ -126,6 +106,21 @@ auth:
   - type: none
     name: "Public"
 ```
+
+#### Setting up RPC endpoints
+
+Before the service can talk to a smart chain, you need to give it an RPC URL for that chain. Three common options:
+
+1. **Public / community RPCs** — free endpoints like `https://api.mainnet-beta.solana.com` or `https://rpc.starknet.lava.build/`. Easiest to start with, but typically rate-limited and not reliable enough for production.
+2. **Hosted providers** — services like Alchemy, Infura, QuickNode, Helius (Solana), Lava, etc. give you a private URL with a generous free tier and paid plans once traffic grows.
+3. **Self-hosted node** — run your own full node and point the API at it. Most control, most operational overhead.
+
+Whichever you pick, paste the URL into the matching key in `config.yaml`. Leave a key out, or set it to `null`, to disable that chain entirely.
+
+A few things to double-check:
+
+- Make sure the **network of each RPC matches the rest of your config** — e.g. don't combine a mainnet Solana RPC with `bitcoinNetwork: TESTNET`. See more details on network compatibility [here](https://docs.atomiq.exchange/developers/quick-start/).
+- **Mainnet Bitcoin** is configured by network name only (`bitcoinNetwork: MAINNET`) and does not need an RPC.
 
 ### 3. Run
 

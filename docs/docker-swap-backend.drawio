@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram name="Page-1" id="uoF7n-WTdIgREUEMLgI6">
-        <mxGraphModel dx="1290" dy="805" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+        <mxGraphModel dx="1035" dy="926" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -37,7 +37,7 @@
                         <mxPoint x="2" y="-29" as="offset"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="iilrnD5Cbvs4D3amgn-0-13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.36;entryY=0.979;entryDx=0;entryDy=0;startArrow=none;startFill=0;exitX=0.642;exitY=0.037;exitDx=0;exitDy=0;exitPerimeter=0;entryPerimeter=0;" parent="1" target="iilrnD5Cbvs4D3amgn-0-10" edge="1" source="iilrnD5Cbvs4D3amgn-0-5">
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.36;entryY=0.979;entryDx=0;entryDy=0;startArrow=none;startFill=0;exitX=0.642;exitY=0.037;exitDx=0;exitDy=0;exitPerimeter=0;entryPerimeter=0;" parent="1" source="iilrnD5Cbvs4D3amgn-0-5" target="iilrnD5Cbvs4D3amgn-0-10" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="260" y="350" as="sourcePoint"/>
                     </mxGeometry>
@@ -60,7 +60,7 @@
                         <mxPoint x="47" y="-47" as="offset"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="iilrnD5Cbvs4D3amgn-0-5" value="&lt;div&gt;atomiq-api-docker&lt;/div&gt;&lt;div&gt;(this project)&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-5" value="&lt;div&gt;Swap API&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
                     <mxGeometry x="200" y="290" width="120" height="60" as="geometry"/>
                 </mxCell>
                 <mxCell id="iilrnD5Cbvs4D3amgn-0-6" value="SQLite&lt;br&gt;swaps states" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" parent="1" vertex="1">
@@ -87,11 +87,11 @@
                         <mxPoint x="630" y="250" as="targetPoint"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="iilrnD5Cbvs4D3amgn-0-22" value="&lt;div&gt;Wallet Backend&lt;/div&gt;&lt;div&gt;(your infrastructure)&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
-                    <mxGeometry x="60" y="260" width="130" height="40" as="geometry"/>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-22" value="atomiq-api-docker&#xa;(this project)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="250" width="120" height="40" as="geometry"/>
                 </mxCell>
                 <mxCell id="iilrnD5Cbvs4D3amgn-0-23" value="Wallet client&lt;br&gt;(mobile, extension, web)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
-                    <mxGeometry x="60" y="410" width="150" height="40" as="geometry"/>
+                    <mxGeometry x="60" y="390" width="150" height="40" as="geometry"/>
                 </mxCell>
                 <mxCell id="iilrnD5Cbvs4D3amgn-0-24" value="Atomiq Network + Chains" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
                     <mxGeometry x="60" y="83" width="160" height="30" as="geometry"/>
