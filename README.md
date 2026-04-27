@@ -55,7 +55,7 @@ The diagram below shows one representative deployment in which a wallet backend 
 
 There are three parties in this typical integration:
 
-![System architecture](docs/system-architecture.svg)
+![System architecture](docs/docker-swap-backend.svg)
 
 **Why three parties?**
 

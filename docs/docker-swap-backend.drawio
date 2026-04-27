@@ -1,0 +1,102 @@
+<mxfile host="65bd71144e">
+    <diagram name="Page-1" id="uoF7n-WTdIgREUEMLgI6">
+        <mxGraphModel dx="1290" dy="805" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="iilrnD5Cbvs4D3amgn-0-1" target="iilrnD5Cbvs4D3amgn-0-2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-4" value="sign PSBT /&lt;br&gt;sign smart-chain tx" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="iilrnD5Cbvs4D3amgn-0-3" vertex="1" connectable="0">
+                    <mxGeometry x="-0.2429" y="1" relative="1" as="geometry">
+                        <mxPoint x="17" y="1" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-1" value="Wallet UI" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="190" y="490" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-2" value="Private keys&lt;br&gt;(BTC, Starknet, Solana, EVM)" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="460" y="490" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="iilrnD5Cbvs4D3amgn-0-5" target="iilrnD5Cbvs4D3amgn-0-6" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.58;entryY=-0.016;entryDx=0;entryDy=0;startArrow=classic;startFill=1;entryPerimeter=0;" parent="1" source="iilrnD5Cbvs4D3amgn-0-5" target="iilrnD5Cbvs4D3amgn-0-1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-21" value="requests:&lt;br&gt;create quotes&lt;br&gt;get quote status" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="iilrnD5Cbvs4D3amgn-0-8" vertex="1" connectable="0">
+                    <mxGeometry x="0.2767" y="1" relative="1" as="geometry">
+                        <mxPoint x="1" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=none;startFill=0;exitX=0.25;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" parent="1" source="iilrnD5Cbvs4D3amgn-0-5" target="iilrnD5Cbvs4D3amgn-0-9" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-18" value="RFQ quotes" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="iilrnD5Cbvs4D3amgn-0-12" vertex="1" connectable="0">
+                    <mxGeometry x="-0.1848" y="2" relative="1" as="geometry">
+                        <mxPoint x="2" y="-29" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.36;entryY=0.979;entryDx=0;entryDy=0;startArrow=none;startFill=0;exitX=0.642;exitY=0.037;exitDx=0;exitDy=0;exitPerimeter=0;entryPerimeter=0;" parent="1" target="iilrnD5Cbvs4D3amgn-0-10" edge="1" source="iilrnD5Cbvs4D3amgn-0-5">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="260" y="350" as="sourcePoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-19" value="fee rates, tx submission" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="iilrnD5Cbvs4D3amgn-0-13" vertex="1" connectable="0">
+                    <mxGeometry x="0.0532" relative="1" as="geometry">
+                        <mxPoint x="28" y="-20" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.892;exitY=-0.008;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;startArrow=none;startFill=0;exitPerimeter=0;" parent="1" source="iilrnD5Cbvs4D3amgn-0-5" target="iilrnD5Cbvs4D3amgn-0-11" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="307" y="270"/>
+                            <mxPoint x="525" y="270"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-20" value="read access, tx submission RPC" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="iilrnD5Cbvs4D3amgn-0-14" vertex="1" connectable="0">
+                    <mxGeometry x="0.1723" y="3" relative="1" as="geometry">
+                        <mxPoint x="47" y="-47" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-5" value="&lt;div&gt;atomiq-api-docker&lt;/div&gt;&lt;div&gt;(this project)&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="200" y="290" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-6" value="SQLite&lt;br&gt;swaps states" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" parent="1" vertex="1">
+                    <mxGeometry x="485" y="280" width="80" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-9" value="LP nodes&lt;br&gt;(RFQ quotes)" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="170" y="123" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-10" value="Bitcoin / Lightning" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="315" y="123" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-11" value="Starknet / Solana / Botanix / Citrea / Alpen / Goat" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="465" y="123" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-16" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=2;rounded=0;" parent="1" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="60" y="390" as="sourcePoint"/>
+                        <mxPoint x="630" y="390" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-17" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=2;rounded=0;" parent="1" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="60" y="250" as="sourcePoint"/>
+                        <mxPoint x="630" y="250" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-22" value="&lt;div&gt;Wallet Backend&lt;/div&gt;&lt;div&gt;(your infrastructure)&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="260" width="130" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-23" value="Wallet client&lt;br&gt;(mobile, extension, web)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="410" width="150" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="iilrnD5Cbvs4D3amgn-0-24" value="Atomiq Network + Chains" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="83" width="160" height="30" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
