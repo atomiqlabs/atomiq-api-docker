@@ -226,55 +226,28 @@ Treat the API key as a shared secret. Whether you ship it to a trusted backend, 
 
 ### JWT auth
 
-Requests are authorized by a signed JWT in the `Authorization: Bearer <jwt>` header. The service:
+Requests are authorized by a signed JWT in the `Authorization: Bearer <jwt>` header. The service verifies the signature against the public key in `config.yaml`, enforces the standard `exp` claim, and checks any additional `claims` you require on the auth entry.
 
-1. Verifies the JWT signature against the public key configured in `config.yaml` using the algorithms listed in `algorithms`.
-2. Enforces the standard `exp` claim.
-3. Checks any additional required claims listed under `claims` on the auth entry.
+The `claims` field lets you gate an auth path on arbitrary JWT payload fields, so the same instance can serve different user tiers from a single signing authority. Two forms are supported:
 
-How the JWT is minted and delivered to the caller is out of scope for this service — issue it from any auth system that can sign with a key pair whose public half you paste into `config.yaml`.
+- **Exact match** — the JWT payload must contain the field with that exact value:
 
-```mermaid
-sequenceDiagram
-    participant C as Client Wallet
-    participant B as Wallet Backend<br/>(auth service)
-    participant A as atomiq-api-docker
+  ```yaml
+  claims:
+    user_tier: "swapper"
+  ```
 
-    Note over B: Holds private key<br/>(JWT signing)
-    Note over A: Holds public key<br/>(JWT verification)
+- **Array-includes** — the JWT payload's array field must contain the given value:
 
-    C->>B: POST /login
-    B->>B: Verify user
-    B->>B: Sign JWT<br/>{ sub, user_tier, exp }
-    B-->>C: { jwt }
+  ```yaml
+  claims:
+    permissions:
+      includes: "swap_permission"
+  ```
 
-    C->>A: GET /getSupportedTokens?side=INPUT<br/>Authorization: Bearer <jwt>
-    A->>A: jwt.verify(jwt, publicKey)<br/>match claims
-    A-->>C: 200 { tokens: [...] }
-```
+All listed claims must match for the entry to authorize the request; otherwise the auth chain falls through to the next entry.
 
-`claims` supports two forms:
-
-- Exact match: `{ user_tier: "swapper" }` — the JWT payload must contain a matching scalar value.
-- Array-includes: `{ permissions: { includes: "swap_permission" } }` — the JWT payload must contain an array that includes the given value.
-
-#### Generating a test key pair + JWT
-
-A helper script is bundled for local testing:
-
-```bash
-npx ts-node --project tsconfig.scripts.json \
-  scripts/generate-jwt.ts \
-  '{"payload":{"sub":"demo","user_tier":"swapper"},"options":{"expiresIn":"1h"}}'
-```
-
-It prints:
-
-- A freshly generated ES256 (P-256) private key (PEM).
-- The matching public key in both multi-line and single-line PEM form — paste the single-line form into `auth[].publicKey` in `config.yaml`.
-- A signed JWT you can use immediately with `Authorization: Bearer ...`.
-
-Pass an existing private key as the second argument to sign with your own key instead.
+How the JWT is minted is out of scope — issue it from any auth system whose public key you can paste into `config.yaml`. A bundled helper script (`scripts/generate-jwt.ts`) generates a key pair and signs a test JWT for local development.
 
 ### Public / no-auth
 
@@ -516,8 +489,7 @@ sequenceDiagram
     participant W as Client Wallet
     participant A as atomiq-api-docker
     participant LP as Atomiq LP
-    participant C1 as Source chain
-    participant C2 as Destination chain
+    participant C as Source/Destination chain
 
     W->>A: POST /createSwap<br/>{ srcToken, dstToken, amount, ... }
     A->>LP: RFQ request
@@ -532,17 +504,17 @@ sequenceDiagram
         alt currentAction = SignPSBT
             W->>W: sign PSBT (BTC key)
             W->>A: POST /submitTransaction<br/>{ signedTxs: [psbtHex] }
-            A->>C1: broadcast
+            A->>C: broadcast
             A-->>W: { txHashes }
         else currentAction = SignSmartChainTransaction
             W->>W: sign smart-chain tx
             W->>A: POST /submitTransaction
-            A->>C2: broadcast
+            A->>C: broadcast
             A-->>W: { txHashes }
         else currentAction = SendToAddress
-            W->>C1: pay address externally<br/>(or LNURL flow)
+            W->>C: pay address externally<br/>(or LNURL flow)
         else currentAction = Wait
-            Note over W,A: Just keep polling until<br/>expectedTimeSeconds elapses
+            Note over W,A: Just keep polling until<br/>isFinished=true or next action becomes available
         else requiresSecretReveal = true
             W->>A: GET /getSwapStatus?swapId=…&secret=<preimage>
         end
@@ -624,7 +596,7 @@ The container writes SQLite files into the directory pointed to by `STORAGE_DIR`
 - `CHAIN_atomiqsdk-1-<CHAINID>.sqlite3` — one per active smart chain; swap state for that chain.
 - `STORE_<name>.sqlite3` — additional SDK state (e.g. `solAccounts`).
 
-The bundled `docker-compose.yml` mounts `./config` read-only into `/src/config`, mounts `./storage` into `/src/storage`, and sets `CONFIG_PATH=/src/config/config.yaml` plus `STORAGE_DIR=/src/storage`. If you run the container directly with `docker run`, mirror those mounts and environment variables — without the storage bind mount the instance cannot resume in-flight swaps after an upgrade.
+The bundled `docker-compose.yml` mounts `./config` read-only into `/src/config`, mounts `./storage` into `/src/storage`, and sets `CONFIG_PATH=/src/config/config.yaml` plus `STORAGE_DIR=/src/storage`.
 
 ---
 
