@@ -64,6 +64,10 @@ const swapper = Factory.newSwapper({
     bitcoinNetwork,
     swapStorage: chainId => new SqliteUnifiedStorage(resolveStoragePath("CHAIN_" + chainId + ".sqlite3")),
     chainStorageCtor: name => new SqliteStorageManager(resolveStoragePath("STORE_" + name + ".sqlite3")),
+    signedKeyBasedAuth: config.lpApiAuth==null ? undefined : {
+        certificate: config.lpApiAuth.certificate,
+        privateKey: config.lpApiAuth.privateKey
+    }
 });
 
 const api = new SwapperApi(swapper);

@@ -43,6 +43,11 @@ export interface HttpsConfig {
     certPath: string;
 }
 
+export interface LpApiAuth {
+    certificate: string;
+    privateKey: string;
+}
+
 export type LogLevel = "error" | "warn" | "info" | "debug";
 
 const LOG_LEVEL_MAP: Record<LogLevel, 0 | 1 | 2 | 3> = {
@@ -76,6 +81,8 @@ export interface Config {
     auth: AuthEntry[];
     cors: CorsConfig | null;
     https: HttpsConfig | null;
+
+    lpApiAuth: LpApiAuth | null;
 }
 
 function resolveConfigPath(configPath: string, filePath: string): string {
@@ -181,6 +188,17 @@ export function loadConfig(): Config {
         };
     }
 
+    let lpApiAuth: LpApiAuth | null = null;
+    if (doc.lpApiAuth != null) {
+        if (typeof doc.lpApiAuth !== "object") {
+            throw new Error("config.yaml: 'lpApiAuth' must be an object when defined");
+        }
+        if (typeof doc.lpApiAuth.certificate !== "string" || typeof doc.lpApiAuth.privateKey !== "string") {
+            throw new Error("config.yaml: 'lpApiAuth.certificate' and 'lpApiAuth.privateKey' must be strings");
+        }
+        lpApiAuth = doc.lpApiAuth;
+    }
+
     return {
         port: doc.port,
         starknetRpc: doc.starknetRpc ?? null,
@@ -196,6 +214,7 @@ export function loadConfig(): Config {
         auth: doc.auth,
         cors,
         https,
+        lpApiAuth,
 
         swapsSyncIntervalSeconds: doc.swapsSyncIntervalSeconds ?? 300,
         reloadLpIntervalSeconds: doc.reloadLpIntervalSeconds ?? 300,
