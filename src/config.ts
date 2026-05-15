@@ -107,6 +107,8 @@ export function loadConfig(): Config {
         throw new Error("config.yaml is empty or malformed");
     }
 
+    doc.port ??= 3000;
+
     if (typeof doc.port !== "number") {
         throw new Error("config.yaml: 'port' is required and must be a number");
     }
