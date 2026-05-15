@@ -2,9 +2,18 @@ import {RequestHandler} from "express";
 import {RateLimitConfig} from "./config";
 import "./auth"; // Ensure Express Request augmentation is loaded
 
-const buckets = new Map<string, { count: number; resetAt: number }>();
-
 export function createRateLimitMiddleware(globalConfig: RateLimitConfig): RequestHandler {
+    const buckets = new Map<string, { count: number; resetAt: number }>();
+
+    const interval = setInterval(() => {
+        const now = Date.now();
+        for(let [key, bucket] of buckets.entries()) {
+            if(now >= bucket.resetAt) buckets.delete(key);
+        }
+    }, 60*1000);
+    // Make sure the timer isn't preventing the process from shutting down
+    interval.unref();
+
     return (req, res, next) => {
         const override = req.rateLimitOverride;
 
