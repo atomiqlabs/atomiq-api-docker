@@ -133,6 +133,17 @@ docker compose up -d
 
 This starts the service on port `3000`, mounts `./config` read-only, and persists the SQLite swap databases in the host `./storage` directory so they survive container restarts — see [Persistence](#persistence). The bundled compose file also sets `CONFIG_PATH=/src/config/config.yaml` and `STORAGE_DIR=/src/storage`.
 
+> **Running on a different port:** If port `3000` is already in use on your host, change the host-side port in `docker-compose.yml` by editing the `ports` mapping. For example, to expose the API on port `8080`:
+>
+> ```yaml
+> services:
+>   atomiq-api:
+>     ports:
+>       - "8080:3000"
+> ```
+>
+> The left side is the host port, the right side is the container port — keep the container port as `3000`. You can then reach the API at `http://localhost:8080`.
+
 You can check the API server's logs with:
 
 ```bash
@@ -498,7 +509,6 @@ sequenceDiagram
 
     loop Poll every action.pollTimeSeconds (default 5s)
         W->>A: GET /getSwapStatus?swapId=<br/>+ bitcoin wallet info if needed
-        A->>A: swap._sync()
         A-->>W: { state, currentAction, isFinished, requiresSecretReveal }
 
         alt currentAction = SignPSBT
